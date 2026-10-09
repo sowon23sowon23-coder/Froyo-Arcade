@@ -8,7 +8,7 @@ A standalone site that collects the Yogurtland froyo games in one place: pick a 
 | `/catch`  | Froyo Catch | Free Play mode from `froyo-catcher` |
 | `/crush`  | Froyo Crush | 21-level match-3 from `Froyo-Crush` |
 | `/wordle` | Wordle      | Daily word from `yogurtland-wordle`, scored on the server |
-| —         | Froyo Slice | Listed as "Coming Soon"; no route yet |
+| `/slice`  | Froyo Slice | 30-second fruit-slicing game built for the arcade (Canvas) |
 
 ## Run locally
 
@@ -40,7 +40,7 @@ npm run start
 src/
   app/                    Routes (Next.js App Router)
     page.tsx, home.css    Arcade home
-    catch|crush|wordle/   One page per game
+    catch|crush|wordle|slice/  One page per game
     api/wordle/           Wordle guess + today endpoints
     globals.css           Design tokens and shared UI styles
   components/arcade/      Shared UI used by every game
@@ -48,28 +48,47 @@ src/
     StartScreen.tsx       Intro: art, pitch, rules, start button
     StatBar.tsx           Score / lives / moves style status tiles
     ResultSheet.tsx       End-of-round card (Play Again, Back to Arcade)
+    SoundToggle.tsx       Header sound on/off button
     Thumbnails.tsx        Card and start-screen art for each game
   games/
     registry.ts           The list of games shown on the home page
     catch/                Froyo Catch
     crush/                Froyo Crush (engine.ts + levels.ts + React wrapper)
     wordle/               Wordle (client UI + server/ scoring)
+    slice/                Froyo Slice (engine.ts loop, art.ts drawings, sound.ts, React screen)
 public/
   catch/                  Resized Froyo Catch art
   brand/                  Yogurtland logo
 ```
 
-## Adding a game (e.g. Froyo Slice)
+## Adding a game
 
-1. In `src/games/registry.ts`, change the `slice` entry's `status` to `'live'` and update its description.
-2. Create `src/app/slice/page.tsx` and a `src/games/slice/` folder for the game.
+1. Add an entry to `src/games/registry.ts` (`status: 'live'` makes the card clickable; `'coming-soon'` shows a disabled card).
+2. Create `src/app/<slug>/page.tsx` and a `src/games/<slug>/` folder for the game.
 3. Build the screens from the shared components:
    - `GameShell` for the page frame and the way back to the arcade.
    - `StartScreen` for the intro and rules.
    - `StatBar` for the in-game status.
    - `ResultSheet` for the end of a round. It always includes **Back to Arcade**.
-4. Replace the placeholder art in `Thumbnails.tsx` (`SliceThumb`) with a real preview.
+4. Add card art for the game in `Thumbnails.tsx`.
 5. When the component unmounts, clear every timer, interval, animation frame, listener, and `AudioContext`.
+
+## Froyo Slice
+
+- **Rules**:
+  - Rounds last 30 seconds, with a 3-2-1 countdown first.
+  - Each fruit cut is +10.
+  - Cutting 3 or more fruits in one swipe adds +20, paid once per swipe.
+  - A bomb is −30, and the score never goes below 0.
+  - Missed fruit costs nothing.
+  - Fruit launches a little more often as the round goes on.
+- **Input**: Pointer Events, so touch and mouse work the same way.
+  - Hits are tested on the segment between the previous and current pointer position (coalesced events included), so fast swipes don't skip fruit.
+  - The canvas uses `touch-action: none`, and the page can't scroll during a round.
+- **Cup**: one half of each sliced fruit flies onto the froyo cup at the bottom of the play area. The cup shows at most 22 toppings.
+- **Pause**: the round pauses automatically when the tab is hidden, and a **Resume** button appears when you come back.
+- **Saved locally**: best score in `froyo-arcade:slice:best` and mute in `froyo-arcade:slice:muted`. Sound starts only after the first tap.
+- **Test hook**: `/slice?test=1` exposes `window.__slice` (`debugPlace`, `debugSpawning`, `debugState`) for automated checks. It does nothing without the query flag.
 
 ## What was carried over from the original games
 

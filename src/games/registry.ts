@@ -39,8 +39,9 @@ export const GAMES: GameEntry[] = [
   {
     slug: 'slice',
     title: 'Froyo Slice',
-    description: 'A new topping-slicing game is in the works. Check back soon.',
-    status: 'coming-soon',
+    description:
+      'Swipe to slice fruit flying up the screen and pile the pieces onto your froyo. Dodge the bombs in a 30-second round.',
+    status: 'live',
   },
 ];
 

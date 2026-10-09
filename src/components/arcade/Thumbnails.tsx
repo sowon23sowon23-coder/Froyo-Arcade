@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { GameSlug } from '@/games/registry';
+import { SliceThumb } from '@/games/slice/SliceThumb';
 import './thumbnails.css';
 
 function CatchThumb() {
@@ -82,23 +83,10 @@ function WordleThumb() {
   );
 }
 
-function SliceThumb() {
+function SliceThumbFrame() {
   return (
     <div className="thumb thumb-slice">
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <g transform="translate(-4 3)">
-          <path d="M28 66h64l-7 34a8 8 0 0 1-8 7H43a8 8 0 0 1-8-7z" fill="#fff" stroke="#d6dbe0" strokeWidth="2" />
-          <path
-            d="M60 12c-9 4-13 12-9 17-11 1-16 10-10 16-12 2-16 13-6 18 3 2 8 3 13 3h24c14 0 20-9 12-16 9-6 4-16-8-17 5-6 0-14-9-18-2-1-5-2-7-3z"
-            fill="#fbeff5"
-            stroke="#e7c6d6"
-            strokeWidth="2"
-          />
-        </g>
-        <path d="M18 98L104 18" stroke="#960953" strokeWidth="3" strokeLinecap="round" strokeDasharray="6 6" opacity=".55" />
-        <circle cx="42" cy="58" r="6" fill="#e02b45" opacity=".7" />
-        <circle cx="74" cy="52" r="5" fill="#8dc63f" opacity=".7" />
-      </svg>
+      <SliceThumb />
     </div>
   );
 }
@@ -112,6 +100,6 @@ export function GameThumbnail({ slug }: { slug: GameSlug }) {
     case 'wordle':
       return <WordleThumb />;
     case 'slice':
-      return <SliceThumb />;
+      return <SliceThumbFrame />;
   }
 }

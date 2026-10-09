@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { GameShell } from '@/components/arcade/GameShell';
 import { ResultSheet, type SheetAction } from '@/components/arcade/ResultSheet';
+import { SoundToggle } from '@/components/arcade/SoundToggle';
 import { StartScreen, type Rule } from '@/components/arcade/StartScreen';
 import { GameThumbnail } from '@/components/arcade/Thumbnails';
 import { getGame } from '@/games/registry';
@@ -52,19 +53,6 @@ const RULES: Rule[] = [
     text: 'Reach the level goal before you run out of moves.',
   },
 ];
-
-function SoundIcon({ on }: { on: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-      <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" />
-      {on ? (
-        <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      ) : (
-        <path d="M16 9.5l5 5m0-5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      )}
-    </svg>
-  );
-}
 
 export default function CrushGame() {
   const game = getGame('crush');
@@ -141,18 +129,13 @@ export default function CrushGame() {
   const soundOn = progress?.settings.sound ?? true;
 
   const soundButton = (
-    <button
-      type="button"
-      className="icon-btn"
-      aria-label={soundOn ? 'Mute sound' : 'Turn sound on'}
-      aria-pressed={!soundOn}
-      onClick={() => {
+    <SoundToggle
+      on={soundOn}
+      onToggle={() => {
         engineRef.current?.setSound(!soundOn);
         refresh();
       }}
-    >
-      <SoundIcon on={soundOn} />
-    </button>
+    />
   );
 
   let sheet: React.ReactNode = null;
