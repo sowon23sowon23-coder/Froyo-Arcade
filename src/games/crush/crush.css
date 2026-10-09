@@ -1,0 +1,869 @@
+/* Froyo Crush: board, tiles and effects keep their original look;
+   the surrounding chrome follows the arcade design system. */
+
+.crush-root {
+  position: relative;
+}
+
+.crush-view[hidden] {
+  display: none !important;
+}
+
+.crush-view {
+  animation: fade-up var(--dur) var(--ease) both;
+}
+
+/* ---------- start screen bits ---------- */
+
+.crush-dot {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 15px;
+  box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.5);
+}
+
+.crush-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.crush-progress b {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.crush-progress-meta {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---------- level map ---------- */
+
+.crush-map {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.crush-worldbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crush-worldbar .icon-btn {
+  font-size: 22px;
+  line-height: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.crush-worldbar .icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.crush-worldname {
+  flex: 1;
+  text-align: center;
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.crush-worldname small {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.crush-mapwrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: linear-gradient(#cfebff 0%, #e9f7d9 55%, #fff1dc 100%);
+}
+
+.crush-swirl {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 360px;
+  height: 640px;
+  transform-origin: top center;
+}
+
+.crush-swirl svg {
+  position: absolute;
+  inset: 0;
+}
+
+.crush-swirl .topping {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
+
+.crush-swirl .node {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  font-family: inherit;
+  font-size: 21px;
+  font-weight: 800;
+  color: #fff;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition: filter var(--dur-fast) var(--ease);
+}
+
+.crush-swirl .node.done {
+  background: linear-gradient(#c8ed7e, #6fa31c);
+  box-shadow: 0 5px 0 #4e7511;
+}
+
+.crush-swirl .node.now {
+  background: linear-gradient(#ff9cc3, var(--brand));
+  box-shadow: 0 5px 0 #6a063b;
+  animation: crush-pulse 1.6s infinite;
+}
+
+.crush-swirl .node.lock {
+  background: linear-gradient(#f2e4ec, #cdb4c2);
+  box-shadow: 0 5px 0 #a98c9c;
+  cursor: default;
+}
+
+@keyframes crush-pulse {
+  0% {
+    box-shadow: 0 5px 0 #6a063b, 0 0 0 0 rgba(150, 9, 83, 0.55);
+  }
+  70% {
+    box-shadow: 0 5px 0 #6a063b, 0 0 0 18px rgba(150, 9, 83, 0);
+  }
+  100% {
+    box-shadow: 0 5px 0 #6a063b, 0 0 0 0 rgba(150, 9, 83, 0);
+  }
+}
+
+.crush-swirl .stars {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  letter-spacing: -1px;
+  white-space: nowrap;
+  color: #e09300;
+}
+
+.crush-swirl .youhere {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--brand);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+}
+
+.crush-map-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ---------- game ---------- */
+
+.crush-game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.crush-levelline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.crush-levelname {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.crush-hud {
+  width: 100%;
+}
+
+.crush-goal-icon {
+  font-style: normal;
+  font-size: 20px;
+}
+
+.crush-scorebar {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  margin: 4px 0 2px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.crush-scorebar i {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--green), var(--gold));
+  transition: width 0.35s var(--ease);
+}
+
+.crush-scorebar .st {
+  position: absolute;
+  top: 50%;
+  font-size: 16px;
+  line-height: 1;
+  color: #c7cdd4;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 0 0 #fff, 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.crush-scorebar .st.on {
+  color: var(--gold);
+  animation: crush-pop 0.4s;
+}
+
+.crush-scorebar .st.burst {
+  animation: crush-st-burst 0.55s;
+}
+
+@keyframes crush-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes crush-st-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5) rotate(-40deg);
+  }
+  55% {
+    transform: translate(-50%, -50%) scale(2) rotate(12deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0);
+  }
+}
+
+.crush-boardwrap {
+  position: relative;
+  width: min(100%, 440px, calc(100dvh - var(--header-h) - env(safe-area-inset-top) - 330px));
+  min-width: 280px;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(#fff8f2, #ffe6d6);
+  border: 1px solid #f3dccd;
+  box-shadow: var(--shadow-md);
+}
+
+.crush-boardwrap.shake {
+  animation: crush-shake 0.22s;
+}
+
+@keyframes crush-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: -2px 1px;
+  }
+  50% {
+    translate: 2px -1px;
+  }
+  75% {
+    translate: -1px 1px;
+  }
+}
+
+.crush-board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  background: repeating-conic-gradient(rgba(193, 15, 94, 0.05) 0% 25%, rgba(193, 15, 94, 0.02) 0% 50%) 0 0 / 25% 25%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.crush-board .tile {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1);
+  will-change: transform;
+  touch-action: none;
+}
+
+.crush-board .tile .body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 -5px 8px rgba(0, 0, 0, 0.28), inset 0 4px 6px rgba(255, 255, 255, 0.55), 0 4px 6px rgba(0, 0, 0, 0.28);
+}
+
+.crush-board .tile .gloss {
+  position: absolute;
+  top: 12%;
+  left: 16%;
+  width: 32%;
+  height: 24%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  filter: blur(1px);
+}
+
+.crush-board .tile em {
+  position: relative;
+  font-style: normal;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
+.crush-board .tile.special-line-h .body::after,
+.crush-board .tile.special-line-v .body::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 78%;
+  height: 12px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, #fff 24% 76%, transparent);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 0 2px rgba(255, 201, 60, 0.7);
+  transform: translate(-50%, -50%);
+}
+
+.crush-board .tile.special-line-v .body::after {
+  width: 12px;
+  height: 78%;
+  background: linear-gradient(180deg, transparent, #fff 24% 76%, transparent);
+}
+
+.crush-board .tile.special-bomb .body {
+  box-shadow: inset 0 -5px 8px rgba(0, 0, 0, 0.28), inset 0 4px 6px rgba(255, 255, 255, 0.55),
+    0 0 0 3px rgba(255, 201, 60, 0.88), 0 0 18px rgba(255, 201, 60, 0.9);
+}
+
+.crush-board .tile.special-bomb em {
+  color: #fff;
+  font-size: 1.1em;
+  text-shadow: 0 0 8px rgba(255, 201, 60, 0.95);
+}
+
+.crush-board .tile.sel {
+  z-index: 8;
+}
+
+.crush-board .tile.sel .body {
+  box-shadow: inset 0 -5px 8px rgba(0, 0, 0, 0.28), inset 0 4px 6px rgba(255, 255, 255, 0.55), 0 0 0 3px #fff,
+    0 0 16px 4px var(--gold);
+}
+
+.crush-board .tile.dragging {
+  z-index: 9;
+  transition: none;
+}
+
+.crush-board .tile.pop {
+  pointer-events: none;
+}
+
+.crush-board .tile.pop .body,
+.crush-board .tile.pop .gloss,
+.crush-board .tile.pop em {
+  animation: crush-popout 0.26s forwards;
+}
+
+@keyframes crush-popout {
+  0% {
+    scale: 1;
+    opacity: 1;
+  }
+  45% {
+    scale: 1.32;
+    opacity: 1;
+  }
+  100% {
+    scale: 0;
+    opacity: 0;
+  }
+}
+
+.crush-board .tile.land .body,
+.crush-board .tile.land .gloss,
+.crush-board .tile.land em {
+  animation: crush-land 0.3s;
+}
+
+@keyframes crush-land {
+  0% {
+    scale: 1 1;
+  }
+  30% {
+    scale: 1.18 0.82;
+  }
+  65% {
+    scale: 0.92 1.08;
+  }
+  100% {
+    scale: 1 1;
+  }
+}
+
+.crush-board .tile.hint em {
+  animation: crush-hint 0.7s infinite;
+}
+
+.crush-board .tile.hint .body {
+  box-shadow: inset 0 -5px 8px rgba(0, 0, 0, 0.28), inset 0 4px 6px rgba(255, 255, 255, 0.55),
+    0 0 0 3px rgba(255, 201, 60, 0.9), 0 0 16px 4px rgba(255, 201, 60, 0.55);
+}
+
+@keyframes crush-hint {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22);
+  }
+}
+
+.crush-board .tile.blocker {
+  cursor: default;
+}
+
+.crush-board .tile.blocker .body {
+  border-radius: 32%;
+  box-shadow: inset 0 -5px 8px rgba(0, 0, 0, 0.3), inset 0 4px 6px rgba(255, 255, 255, 0.5), 0 0 0 2px #8f5a22,
+    0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.crush-board .tile.blocker .gloss {
+  display: none;
+}
+
+.crush-board .tile.blocker em {
+  font-size: 1.25em;
+}
+
+.crush-board .icelayer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.crush-board .ice {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(214, 242, 255, 0.62), rgba(255, 255, 255, 0.28));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85), inset 0 0 12px rgba(110, 196, 255, 0.65);
+}
+
+.crush-board .ice.t2 {
+  background: linear-gradient(135deg, rgba(150, 212, 255, 0.84), rgba(226, 244, 255, 0.55));
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 16px rgba(70, 170, 255, 0.9), 0 0 6px rgba(120, 200, 255, 0.6);
+}
+
+.crush-board .ice::after {
+  content: '';
+  position: absolute;
+  left: 14%;
+  top: 12%;
+  width: 34%;
+  height: 16%;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.75);
+  transform: rotate(-24deg);
+}
+
+.crush-board .float {
+  position: absolute;
+  z-index: 20;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--gold);
+  text-shadow: 0 2px 0 rgba(90, 4, 42, 0.7);
+  pointer-events: none;
+  animation: crush-floatup 0.8s ease-out forwards;
+}
+
+@keyframes crush-floatup {
+  0% {
+    transform: translate(-50%, 0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -52px);
+    opacity: 0;
+  }
+}
+
+.crush-board .spark {
+  position: absolute;
+  z-index: 19;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.crush-board .wave {
+  position: absolute;
+  z-index: 18;
+  border: 4px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.crush-combo {
+  position: absolute;
+  top: 36%;
+  left: 50%;
+  z-index: 30;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 0 18px rgba(255, 201, 60, 0.9), 0 3px 0 var(--brand), 0 6px 0 rgba(90, 4, 42, 0.5);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.crush-combo.go {
+  animation: crush-combo-in 0.85s ease-out;
+}
+
+@keyframes crush-combo-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(-8deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15) rotate(3deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -90%) scale(0.95);
+  }
+}
+
+.crush-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 40%;
+  z-index: 45;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 3px 0 var(--brand), 0 0 24px rgba(255, 201, 60, 0.95);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.crush-banner.go {
+  animation: crush-banner-in 1.25s ease-out;
+}
+
+@keyframes crush-banner-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-50px) skewX(-16deg);
+  }
+  16% {
+    opacity: 1;
+    transform: none;
+  }
+  72% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(50px) skewX(16deg);
+  }
+}
+
+.crush-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 44;
+  border-radius: inherit;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.crush-flash.go {
+  animation: crush-flash-out 0.24s;
+}
+
+@keyframes crush-flash-out {
+  0% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.crush-tutorial {
+  position: absolute;
+  inset: auto 16px 16px;
+  z-index: 46;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.crush-tutorial.on {
+  display: flex;
+  animation: fade-up var(--dur) var(--ease) both;
+}
+
+.crush-tutorial b {
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+
+.crush-tutorial span {
+  margin-bottom: 10px;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.crush-tutorial .gesture {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  margin: -34px auto 6px;
+  border-radius: 50%;
+  background: linear-gradient(#ff9cc3, var(--brand));
+  box-shadow: 0 5px 0 #6a063b;
+  animation: crush-gesture 1.2s infinite;
+}
+
+.crush-tutorial .gesture::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  width: 16px;
+  height: 22px;
+  border-radius: 10px;
+  background: #fff;
+}
+
+@keyframes crush-gesture {
+  0%,
+  100% {
+    translate: -18px 0;
+  }
+  50% {
+    translate: 18px 0;
+  }
+}
+
+.crush-boosters {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.crush-bo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.crush-bo:active {
+  transform: scale(0.94);
+}
+
+.crush-bo.armed {
+  border-color: var(--brand);
+  background: var(--brand-weak);
+  box-shadow: 0 0 0 3px rgba(150, 9, 83, 0.18);
+}
+
+.crush-bo b {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border: 2px solid var(--bg);
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.crush-bo b:empty {
+  display: none;
+}
+
+.crush-bo.off {
+  filter: grayscale(0.8);
+  opacity: 0.45;
+}
+
+.crush-root .flyer {
+  position: absolute;
+  z-index: 70;
+  font-size: 24px;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.35));
+}
+
+.crush-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.crush-confetti .conf {
+  position: absolute;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation: crush-conf-fall linear forwards;
+}
+
+@keyframes crush-conf-fall {
+  0% {
+    transform: translateY(-30px) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0.9;
+  }
+}
+
+/* ---------- result sheet ---------- */
+
+.crush-starrow {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.crush-starrow span {
+  font-size: 40px;
+  line-height: 1;
+  color: var(--surface-3);
+  transform: scale(0.8);
+}
+
+.crush-starrow span.on {
+  color: var(--gold);
+  transform: none;
+  animation: crush-star-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) backwards;
+}
+
+.crush-starrow span:nth-child(2).on {
+  animation-delay: 0.15s;
+}
+
+.crush-starrow span:nth-child(3).on {
+  animation-delay: 0.3s;
+}
+
+@keyframes crush-star-in {
+  0% {
+    transform: scale(2.2) rotate(-25deg);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
