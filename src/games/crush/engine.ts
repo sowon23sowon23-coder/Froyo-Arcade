@@ -93,6 +93,14 @@ export function createCrushGame(root: HTMLElement, cb: CrushCallbacks) {
   let targetScore = 6000;
   let ice: number[][] = [];
   let iceEls: (HTMLDivElement | null)[][] = [];
+  // Pending clear/fail result. Guards against the original bug where a swap made
+  // during the short pause before the result fired a second clear (crediting the
+  // next level without playing it).
+  let endTimer: number | null = null;
+  const cancelEnd = () => {
+    cancelLater(endTimer);
+    endTimer = null;
+  };
 
   /* ---------------- goals ---------------- */
   function levelGoal(level: Level) {
@@ -667,6 +675,7 @@ export function createCrushGame(root: HTMLElement, cb: CrushCallbacks) {
   }
 
   function startLevel() {
+    cancelEnd();
     const level = currentLevel();
     moves = level.moves;
     goal = levelGoal(level);
@@ -1064,8 +1073,13 @@ export function createCrushGame(root: HTMLElement, cb: CrushCallbacks) {
 
   async function checkEnd() {
     clearHint();
+    if (endTimer !== null) return;
     if (isGoalComplete()) {
-      later(levelClear, 760);
+      busy = true; // hold input until the result shows
+      endTimer = later(() => {
+        endTimer = null;
+        levelClear();
+      }, 760);
       return;
     }
     if (moves <= 0) {
@@ -1073,7 +1087,11 @@ export function createCrushGame(root: HTMLElement, cb: CrushCallbacks) {
       const needed = goalLeftText();
       blip(160, 0.4, 'sawtooth', 0.05);
       buzz([30, 60, 30]);
-      later(() => cb.onFail({ level, needed }), 380);
+      busy = true;
+      endTimer = later(() => {
+        endTimer = null;
+        cb.onFail({ level, needed });
+      }, 380);
       return;
     }
     if (!findMove()) {
@@ -1216,6 +1234,7 @@ export function createCrushGame(root: HTMLElement, cb: CrushCallbacks) {
       armed = null;
     },
     addMoves() {
+      busy = false;
       moves += 5;
       syncHud();
       showBanner('+5 MOVES!');

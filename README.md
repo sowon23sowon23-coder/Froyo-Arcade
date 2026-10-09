@@ -80,6 +80,7 @@ public/
   - Mouse and touch-drag controls work as before.
   - Best score and the chosen cup are saved in `localStorage`.
 - **Froyo Crush** keeps the same levels, matching, specials, ice, cookies, boosters (shuffle, bomb, spoon), "+5 moves", scoring, and star rating. Progress is saved in `localStorage`.
+  - One bug from the original was fixed: a swap made in the brief pause before the "Level complete" card could trigger a second clear, which marked the next level as cleared without playing it.
 - **Wordle** keeps the original rules:
   - Six tries, standard duplicate-letter scoring, and the same allowed-word list.
   - Physical and on-screen keyboards.
