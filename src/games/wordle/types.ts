@@ -1,4 +1,6 @@
-export type TileMark = 'correct' | 'present' | 'absent';
+import type { MissionOutcome } from '@/rewards/types';
+
+export type TileMark ='correct' | 'present' | 'absent';
 
 export type GuessRecord = {
   guess: string;
@@ -25,6 +27,8 @@ export type TodayResponse = {
   /** Only present once today's game has finished (won or lost). */
   answer: string | null;
   stats: PlayerStats;
+  /** Today's reward mission, once the game has finished. */
+  mission: MissionOutcome;
 };
 
 export type GuessErrorReason = 'invalid_length' | 'invalid_characters' | 'not_in_wordlist' | 'already_finished';
@@ -37,5 +41,6 @@ export type GuessResponse =
       status: GameStatus;
       answer: string | null;
       stats: PlayerStats;
+      mission: MissionOutcome;
     }
   | { ok: false; reason: GuessErrorReason };

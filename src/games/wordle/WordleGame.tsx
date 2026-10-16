@@ -7,6 +7,11 @@ import { StartScreen, type Rule } from '@/components/arcade/StartScreen';
 import { StatBar } from '@/components/arcade/StatBar';
 import { GameThumbnail } from '@/components/arcade/Thumbnails';
 import { getGame } from '@/games/registry';
+import { startPlay } from '@/rewards/client/api';
+import { savePendingClaim } from '@/rewards/client/pending';
+import type { MissionOutcome } from '@/rewards/types';
+import { MissionCard } from '@/rewards/ui/MissionCard';
+import { MissionResult } from '@/rewards/ui/MissionResult';
 import {
   MAX_ATTEMPTS,
   type GuessErrorReason,
@@ -165,6 +170,8 @@ export default function WordleGame() {
   const [showResult, setShowResult] = useState(false);
   const [shareNote, setShareNote] = useState('');
   const [nextWordIn, setNextWordIn] = useState(() => msUntilNextWord());
+  const [mission, setMission] = useState<MissionOutcome>({ state: 'off' });
+  const startLogged = useRef(false);
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const mounted = useRef(true);
 
@@ -195,6 +202,7 @@ export default function WordleGame() {
     setGuesses(data.guesses);
     setStats(data.stats);
     setAnswer(data.answer);
+    setMission(data.mission);
     setFinished(data.status === 'won' || data.status === 'lost');
     setCurrent('');
     setFlipIdx(-1);
@@ -254,6 +262,8 @@ export default function WordleGame() {
     if (res.status === 'won' || res.status === 'lost') {
       setFinished(true);
       setAnswer(res.answer);
+      setMission(res.mission);
+      if (res.mission.state === 'achieved') savePendingClaim(res.mission.claimId, 'wordle');
       setToday((t) => (t ? { ...t, status: res.status, attempts: res.attempt } : t));
       later(() => setShowResult(true), 1100);
     }
@@ -306,6 +316,10 @@ export default function WordleGame() {
   };
 
   const enterGame = () => {
+    if (today?.status === 'not_started' && !startLogged.current) {
+      startLogged.current = true;
+      void startPlay('wordle');
+    }
     setView('play');
     window.scrollTo({ top: 0 });
     if (finished) setShowResult(true);
@@ -355,6 +369,7 @@ export default function WordleGame() {
             )}
             {finished && <span className="badge badge-brand">Today&apos;s word is done</span>}
           </div>
+          <MissionCard game="wordle" />
         </StartScreen>
       </GameShell>
     );
@@ -436,6 +451,7 @@ export default function WordleGame() {
           note={`One word per day. The next word unlocks in ${formatCountdown(nextWordIn)}.`}
         >
           {answer ? <TileRow letters={answer} marks={Array(5).fill(won ? 'correct' : 'absent')} /> : null}
+          <MissionResult game="wordle" outcome={mission} />
         </ResultSheet>
       )}
     </GameShell>

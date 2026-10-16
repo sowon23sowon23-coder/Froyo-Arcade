@@ -1,0 +1,614 @@
+/* Rewards: home banner, mission boxes in games, sign-in, My Rewards, in-store QR. */
+
+.rw-sample {
+  align-self: flex-start;
+  background: #fff7e0;
+  color: var(--gold-strong);
+}
+
+.rw-muted {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.rw-fine {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+
+.rw-center {
+  text-align: center;
+}
+
+.rw-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.rw-error {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-weak);
+  color: #b4232a;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.rw-notice {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+.rw-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* ---------- home ---------- */
+
+.rw-header-btn {
+  position: relative;
+  gap: 6px;
+}
+
+.rw-header-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rw-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.rw-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid var(--brand-weak-2);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--brand-weak) 0%, #fff 70%);
+  animation: fade-up var(--dur) var(--ease) both;
+}
+
+.rw-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rw-banner h2 {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rw-banner p {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.rw-banner-note {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+@media (min-width: 720px) {
+  .rw-banner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding: 22px 24px;
+  }
+  .rw-banner-status {
+    flex: none;
+  }
+}
+
+/* ---------- inside games ---------- */
+
+.rw-mission {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-color: var(--brand-weak-2);
+}
+
+.rw-mission-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rw-mission-head > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.rw-mission-head b {
+  font-size: var(--fs-md);
+}
+
+.rw-gift {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-weak);
+  font-size: 20px;
+}
+
+.rw-mission-note {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.rw-mission-note a {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.rw-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+.rw-result b {
+  color: var(--text);
+}
+
+.rw-result .btn {
+  margin-top: 8px;
+}
+
+.rw-result.is-won {
+  background: var(--brand-weak);
+}
+
+.rw-result.is-won b {
+  color: var(--brand);
+  font-size: var(--fs-md);
+}
+
+.rw-result.is-pending {
+  color: var(--text-3);
+}
+
+/* ---------- pages ---------- */
+
+.rw-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rw-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.rw-intro h2 {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rw-intro p {
+  max-width: 400px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.rw-intro .rw-sample {
+  align-self: center;
+}
+
+.rw-big {
+  font-size: 44px;
+  line-height: 1.1;
+}
+
+.rw-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 20px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+.rw-empty b {
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+
+.rw-account {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+
+/* ---------- sign-in ---------- */
+
+.rw-signin {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+
+.rw-signin form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rw-field span {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.rw-field input {
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  /* 16px+ stops iOS from zooming into the field. */
+  font: inherit;
+  font-size: 17px;
+}
+
+.rw-field input:focus {
+  border-color: var(--brand);
+  outline: 3px solid rgba(150, 9, 83, 0.15);
+}
+
+.rw-field input[inputmode='numeric'] {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.rw-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.rw-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand);
+}
+
+.rw-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+.rw-or::before,
+.rw-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.rw-google {
+  gap: 10px;
+}
+
+.rw-google svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---------- coupon ---------- */
+
+.rw-coupon {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px dashed var(--brand-weak-2);
+  background:
+    radial-gradient(circle at 0 50%, var(--bg) 9px, transparent 10px),
+    radial-gradient(circle at 100% 50%, var(--bg) 9px, transparent 10px),
+    var(--surface);
+}
+
+.rw-coupon.is-shown,
+.rw-coupon.is-expired {
+  border-color: var(--border-strong);
+}
+
+.rw-coupon.is-shown h2,
+.rw-coupon.is-expired h2 {
+  color: var(--text-3);
+}
+
+.rw-coupon-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rw-coupon h2 {
+  color: var(--brand);
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.rw-status.is-available {
+  background: var(--green-weak);
+  color: var(--green-strong);
+}
+
+.rw-status.is-showing {
+  background: var(--brand);
+  color: #fff;
+}
+
+.rw-status.is-shown,
+.rw-status.is-expired {
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+
+.rw-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.rw-meta div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rw-meta dt,
+.rw-qr-meta dt {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.rw-meta dd,
+.rw-qr-meta dd {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.rw-code {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.rw-coupon-note {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.rw-use {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.rw-terms {
+  margin: 0;
+  padding: 16px 16px 16px 34px;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.rw-terms li + li {
+  margin-top: 6px;
+}
+
+.rw-stores {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rw-stores li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.rw-stores li + li {
+  border-top: 1px solid var(--border);
+}
+
+.rw-stores li > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+
+.rw-stores li span {
+  color: var(--text-2);
+}
+
+/* ---------- in-store QR ---------- */
+
+.rw-qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  animation: fade-in var(--dur-fast) var(--ease) both;
+}
+
+.rw-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 380px);
+  padding: 24px 20px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.rw-qr-card h2 {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+}
+
+.rw-qr-frame {
+  width: min(72vw, 280px);
+  padding: 10px;
+  border: 3px solid var(--brand);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.rw-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.rw-qr-timer {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-2);
+}
+
+.rw-qr-timer b {
+  color: var(--brand);
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.rw-live-dot {
+  align-self: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: rw-pulse 1s ease-in-out infinite;
+}
+
+@keyframes rw-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+.rw-qr-bar {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.rw-qr-bar i {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  transform-origin: left center;
+  transition: transform 100ms linear;
+}
+
+.rw-qr-meta {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin: 4px 0 0;
+}
+
+.rw-qr-meta div {
+  display: flex;
+  flex-direction: column;
+}
+
+.rw-qr-meta dd {
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+}

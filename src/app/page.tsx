@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { GameThumbnail } from '@/components/arcade/Thumbnails';
 import { GAMES, gameHref, type GameEntry } from '@/games/registry';
+import { RewardsBanner, RewardsButton } from '@/rewards/ui/HomeRewards';
 import './home.css';
 
 function PlayIcon() {
@@ -60,12 +61,16 @@ export default function HomePage() {
   return (
     <div className="home">
       <header className="home-head">
-        <img className="home-logo" src="/brand/yogurtland-logo.png" alt="Yogurtland" width={112} height={30} />
+        <div className="home-top">
+          <img className="home-logo" src="/brand/yogurtland-logo.png" alt="Yogurtland" width={112} height={30} />
+          <RewardsButton />
+        </div>
         <h1>Froyo Arcade</h1>
         <p>Sweet little games, served by the cup. Pick one and start playing, no sign-up needed.</p>
       </header>
 
       <main>
+        <RewardsBanner />
         <ul className="game-grid">
           {GAMES.map((game, i) => (
             <li key={game.slug}>

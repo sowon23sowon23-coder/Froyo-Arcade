@@ -8,6 +8,10 @@ import { SoundToggle } from '@/components/arcade/SoundToggle';
 import { StartScreen, type Rule } from '@/components/arcade/StartScreen';
 import { GameThumbnail } from '@/components/arcade/Thumbnails';
 import { getGame } from '@/games/registry';
+import { PROMOTION } from '@/rewards/config';
+import { usePlaySession } from '@/rewards/client/hooks';
+import { MissionCard } from '@/rewards/ui/MissionCard';
+import { MissionResult } from '@/rewards/ui/MissionResult';
 import { createCrushGame, type ClearResult, type CrushEngine, type FailResult } from './engine';
 import { LEVELS, WORLDS, currentLevelOf, worldOf, type CrushState } from './levels';
 import './crush.css';
@@ -56,6 +60,7 @@ const RULES: Rule[] = [
 
 export default function CrushGame() {
   const game = getGame('crush');
+  const mission = usePlaySession('crush');
   const rootRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<CrushEngine | null>(null);
   const [view, setView] = useState<'start' | 'map' | 'game'>('start');
@@ -74,9 +79,10 @@ export default function CrushGame() {
       setView('game');
     });
     window.scrollTo({ top: 0 });
+    mission.ensure();
     engineRef.current?.startLevel();
     refresh();
-  }, [refresh]);
+  }, [refresh, mission.ensure]);
 
   const openMap = useCallback(() => {
     engineRef.current?.leaveBoard();
@@ -98,12 +104,13 @@ export default function CrushGame() {
   }, [refresh]);
 
   // Latest handlers for the engine, which is created once.
-  const handlers = useRef({ openGame, openStart, refresh });
-  handlers.current = { openGame, openStart, refresh };
+  const handlers = useRef({ openGame, openStart, refresh, finishMission: mission.finish });
+  handlers.current = { openGame, openStart, refresh, finishMission: mission.finish };
 
   useEffect(() => {
     const engine = createCrushGame(rootRef.current!, {
       onClear: (r) => {
+        void handlers.current.finishMission({ level: r.level.n }, true);
         setResult({ kind: 'clear', r });
         handlers.current.refresh();
       },
@@ -178,6 +185,15 @@ export default function CrushGame() {
             </span>
           ))}
         </div>
+        <MissionResult
+          game="crush"
+          outcome={mission.outcome}
+          progressNote={
+            PROMOTION.missions.crush && r.level.n < PROMOTION.missions.crush.level
+              ? `Keep going: clear Level ${PROMOTION.missions.crush.level} to earn the reward.`
+              : undefined
+          }
+        />
       </ResultSheet>
     );
   } else if (result?.kind === 'fail') {
@@ -235,6 +251,7 @@ export default function CrushGame() {
               </span>
             </div>
           </div>
+          <MissionCard game="crush" />
         </StartScreen>
       )}
 

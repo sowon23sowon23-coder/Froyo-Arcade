@@ -7,6 +7,9 @@ import { StartScreen, type Rule } from '@/components/arcade/StartScreen';
 import { StatBar } from '@/components/arcade/StatBar';
 import { GameThumbnail } from '@/components/arcade/Thumbnails';
 import { getGame } from '@/games/registry';
+import { usePlaySession } from '@/rewards/client/hooks';
+import { MissionCard } from '@/rewards/ui/MissionCard';
+import { MissionResult } from '@/rewards/ui/MissionResult';
 import './catch.css';
 
 // Ported from froyo-catcher (Free Play, the mode the live game ships).
@@ -127,6 +130,7 @@ const RULES: Rule[] = [
 
 export default function CatchGame() {
   const game = getGame('catch');
+  const mission = usePlaySession('catch');
   const [view, setView] = useState<'start' | 'game'>('start');
   const [character, setCharacter] = useState<CharId>('green');
   const [phase, setPhase] = useState<'idle' | 'play' | 'over'>('idle');
@@ -294,6 +298,7 @@ export default function CatchGame() {
 
     stopLoops();
     setPhase('over');
+    void mission.finish({ score });
 
     const prevBest = Number(readStorage(BEST_KEY) || 0);
     const isNewBest = score > prevBest;
@@ -343,6 +348,7 @@ export default function CatchGame() {
     later(() => {
       setCountdown(null);
       setPhase('play');
+      mission.begin();
     }, 900);
   };
 
@@ -630,6 +636,7 @@ export default function CatchGame() {
               Your best score <b>{best}</b>
             </p>
           )}
+          <MissionCard game="catch" />
         </StartScreen>
       </GameShell>
     );
@@ -753,7 +760,9 @@ export default function CatchGame() {
             { label: 'Play Again', onClick: start },
             { label: 'Change Cup', onClick: () => setView('start'), variant: 'secondary' },
           ]}
-        />
+        >
+          <MissionResult game="catch" outcome={mission.outcome} />
+        </ResultSheet>
       )}
     </GameShell>
   );

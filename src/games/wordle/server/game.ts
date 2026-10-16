@@ -1,6 +1,12 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import words from './allowed-guesses.json';
+import { PROMOTION } from '@/rewards/config';
+import { anonId } from '@/rewards/server/anon';
+import { logEvent } from '@/rewards/server/events';
+import { createClaim } from '@/rewards/server/missions';
+import { rewardsConfigured } from '@/rewards/server/supabase';
+import type { MissionOutcome } from '@/rewards/types';
 import { scoreGuess } from './scoring';
 import { MAX_ATTEMPTS, type GameStatus, type GuessResponse, type TodayResponse } from '../types';
 
@@ -30,10 +36,11 @@ export function getPlayDate(now: Date = new Date()): string {
   }).format(now);
 }
 
-/** d = play date, g = today's guesses, p/w/s = plays / wins / streak. */
-type SavedState = { d: string; g: string[]; p: number; w: number; s: number };
+/** d = play date, g = today's guesses, p/w/s = plays / wins / streak, m = today's reward mission claim. */
+type SavedState = { d: string; g: string[]; p: number; w: number; s: number; m?: string };
 
 const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+const isClaimId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f-]{36}$/.test(v);
 
 async function readState(playDate: string): Promise<SavedState> {
   const fresh: SavedState = { d: playDate, g: [], p: 0, w: 0, s: 0 };
@@ -48,7 +55,8 @@ async function readState(playDate: string): Promise<SavedState> {
       return fresh;
     }
     // A new day keeps the stats but starts a clean board.
-    return { d: playDate, g: v.d === playDate ? (v.g as string[]) : [], p: v.p, w: v.w, s: v.s };
+    if (v.d !== playDate) return { d: playDate, g: [], p: v.p, w: v.w, s: v.s };
+    return { d: playDate, g: v.g as string[], p: v.p, w: v.w, s: v.s, ...(isClaimId(v.m) ? { m: v.m } : {}) };
   } catch {
     return fresh;
   }
@@ -70,6 +78,15 @@ function statusOf(state: SavedState): GameStatus {
   return state.g.length >= MAX_ATTEMPTS ? 'lost' : 'in_progress';
 }
 
+function missionOf(state: SavedState, status: GameStatus): MissionOutcome {
+  const mission = PROMOTION.missions.wordle;
+  if (!rewardsConfigured() || !mission) return { state: 'off' };
+  if (status === 'lost') return { state: 'missed' };
+  if (status !== 'won') return { state: 'off' };
+  if (state.g.length > mission.maxAttempts) return { state: 'missed' };
+  return state.m ? { state: 'achieved', claimId: state.m } : { state: 'error' };
+}
+
 export async function getToday(): Promise<TodayResponse> {
   const playDate = getPlayDate();
   const state = await readState(playDate);
@@ -83,6 +100,7 @@ export async function getToday(): Promise<TodayResponse> {
     guesses: state.g.map((guess) => ({ guess, marks: scoreGuess(guess, ANSWER) })),
     answer: finished ? ANSWER : null,
     stats: { plays: state.p, wins: state.w, streak: state.s },
+    mission: missionOf(state, status),
   };
 }
 
@@ -103,6 +121,17 @@ export async function submitGuess(raw: unknown): Promise<GuessResponse> {
     state.p += 1;
     state.w += status === 'won' ? 1 : 0;
     state.s = status === 'won' ? state.s + 1 : 0;
+
+    // The answer is checked here on the server, so a win is trusted as-is.
+    if (rewardsConfigured()) {
+      const anon = await anonId();
+      logEvent({ type: 'game_complete', game: 'wordle', anonId: anon, meta: { attempts: state.g.length, won: status === 'won' } });
+      const mission = PROMOTION.missions.wordle;
+      if (status === 'won' && mission && state.g.length <= mission.maxAttempts) {
+        const claim = await createClaim({ game: 'wordle', anonId: anon, playSessionId: null, result: { attempts: state.g.length } });
+        if (claim.state === 'achieved') state.m = claim.claimId;
+      }
+    }
   }
   await writeState(state);
 
@@ -113,5 +142,6 @@ export async function submitGuess(raw: unknown): Promise<GuessResponse> {
     status,
     answer: finished ? ANSWER : null,
     stats: { plays: state.p, wins: state.w, streak: state.s },
+    mission: missionOf(state, status),
   };
 }

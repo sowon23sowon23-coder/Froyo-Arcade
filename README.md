@@ -1,14 +1,16 @@
 # Froyo Arcade
 
-A standalone site that collects the Yogurtland froyo games in one place: pick a game on the home page and play it in the browser. No sign-up, rewards, or leaderboards.
+A standalone site that collects the Yogurtland froyo games in one place: pick a game on the home page and play it in the browser. Games need no sign-up. Players who complete one game's reward mission can sign in to save a coupon and show it in store (see [Rewards](#rewards)).
 
-| Route     | Game        | Notes |
-| --------- | ----------- | ----- |
-| `/`       | Arcade home | Game cards from `src/games/registry.ts` |
-| `/catch`  | Froyo Catch | Free Play mode from `froyo-catcher` |
-| `/crush`  | Froyo Crush | 21-level match-3 from `Froyo-Crush` |
-| `/wordle` | Wordle      | Daily word from `yogurtland-wordle`, scored on the server |
-| `/slice`  | Froyo Slice | 30-second fruit-slicing game built for the arcade (Canvas) |
+| Route            | Page         | Notes |
+| ---------------- | ------------ | ----- |
+| `/`              | Arcade home  | Game cards from `src/games/registry.ts`, rewards banner, **My Rewards** button |
+| `/catch`         | Froyo Catch  | Free Play mode from `froyo-catcher` |
+| `/crush`         | Froyo Crush  | 21-level match-3 from `Froyo-Crush` |
+| `/wordle`        | Wordle       | Daily word from `yogurtland-wordle`, scored on the server |
+| `/slice`         | Froyo Slice  | 30-second fruit-slicing game built for the arcade (Canvas) |
+| `/rewards`       | My Rewards   | Sign-in, the coupon, participating stores, **Use in store** |
+| `/rewards/claim` | Claim Reward | Mission complete → sign in → coupon saved |
 
 ## Run locally
 
@@ -28,11 +30,17 @@ npm run start
 
 `npm run typecheck` runs the TypeScript compiler without emitting files.
 
-### Optional environment variables
+### Environment variables
 
-| Name            | Default               | Used for |
-| --------------- | --------------------- | -------- |
-| `GAME_TIMEZONE` | `America/Los_Angeles` | When the Wordle day rolls over |
+Copy `.env.example` to `.env.local`. Every variable is optional: with none set, the site runs games-only.
+
+| Name                            | Used for |
+| ------------------------------- | -------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Rewards: Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Rewards: sign-in from the browser |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Rewards: server-only database access. Never expose it |
+| `STORE_QR_VALUE`                | The shared in-store QR payload. Until it's set, **Use in store** stays disabled |
+| `GAME_TIMEZONE`                 | When the Wordle day rolls over (default `America/Los_Angeles`) |
 
 ## Project layout
 
@@ -42,6 +50,11 @@ src/
     page.tsx, home.css    Arcade home
     catch|crush|wordle|slice/  One page per game
     api/wordle/           Wordle guess + today endpoints
+    api/play/             Round start/finish (server-side mission check)
+    api/rewards/          me, claim, execute (in-store QR)
+    api/events/           Funnel events the browser sees (store taps, views)
+    auth/callback/        Google sign-in return
+    rewards/              My Rewards and Claim Reward pages
     globals.css           Design tokens and shared UI styles
   components/arcade/      Shared UI used by every game
     GameShell.tsx         Sticky header with "Arcade" back button
@@ -56,6 +69,13 @@ src/
     crush/                Froyo Crush (engine.ts + levels.ts + React wrapper)
     wordle/               Wordle (client UI + server/ scoring)
     slice/                Froyo Slice (engine.ts loop, art.ts drawings, sound.ts, React screen)
+  rewards/
+    config.ts             Promotion settings: missions, reward, expiry, stores (edit here)
+    types.ts              Coupon states and API shapes
+    server/               Supabase access, mission checks, coupon issue/execute, events
+    client/               API calls, hooks, in-app browser detection
+    ui/                   Mission boxes, sign-in, coupon card, QR screen, home banner
+supabase/migrations/      Database schema (run once per Supabase project)
 public/
   catch/                  Resized Froyo Catch art
   brand/                  Yogurtland logo
@@ -106,9 +126,81 @@ public/
   - One word per day. The answer never reaches the browser until the game ends.
   - Progress and stats are kept in an httpOnly cookie.
 
-Removed for this release: sign-in, coupons and rewards, leaderboards, store redemption, admin tools, and the Supabase backend.
+Still not carried over: leaderboards and admin tools. Rewards were rebuilt for the arcade (below), not ported.
+
+## Rewards
+
+Complete **any one** game's mission and an account can save **one coupon per promotion**. The coupon is shown in store as the **shared, fixed QR** that stores already scan; each customer's coupon record only controls whether *their* screen may show it.
+
+### Flow
+
+1. Home → pick a game. Its start screen shows the reward mission.
+2. Play without signing in. The server starts a play session when the round begins.
+3. The round ends and the server checks the mission. If it was met, it saves a **mission claim** tied to this browser.
+4. **Claim your reward** opens `/rewards/claim`. If the player isn't signed in, they sign in there and the claim is kept.
+   - Email 6-digit code is the main method. It works inside Instagram's browser and never leaves the page.
+   - **Continue with Google** appears only in a regular browser, because Google blocks sign-in in in-app browsers.
+5. The server issues the coupon, or returns the existing one: the database allows one per account per promotion.
+6. In store: **My Rewards** → **Use in store** → confirm → the QR shows for `qrDisplaySeconds` (10 by default), then disappears for good.
+
+### Coupon states
+
+| State       | Meaning |
+| ----------- | ------- |
+| `available` | Saved, not opened in store |
+| `showing`   | The QR is on screen now (inside the display window) |
+| `shown`     | The QR was opened and its window ended. This is a **use attempt**, not a confirmed discount: the POS doesn't report back |
+| `expired`   | Passed its expiry date without being opened |
+
+The state is never stored. It is derived from `issued_at`, `expires_at`, and `qr_executed_at` against the server clock.
+
+### How the one-time QR is enforced
+
+- `execute_coupon_qr` (in the migration) sets `qr_executed_at = now()` in one `UPDATE … WHERE qr_executed_at IS NULL`.
+  - Concurrent taps or devices serialize on the row lock. Only the first sets the time; the rest get the original time back.
+- Refresh, back, reopen, or another device all read the same `qr_executed_at`, so they only show what is left of the same window.
+- Nothing is written if the request never reaches the database, if the coupon is expired, or if `STORE_QR_VALUE` is unset. In those cases the coupon stays `available`.
+- `STORE_QR_VALUE` is server-only. It is sent to a browser only while that browser's coupon is `showing`.
+- The QR screen shows a ticking clock, a pulsing dot, and the coupon code so staff can tell a live screen from a screenshot.
+  - **This does not stop copying of the shared QR itself.** That QR never expires, so anyone who photographs it can reuse it. Only staff checking for a live screen, or a POS integration, closes that gap.
+
+### Mission checks
+
+- **Wordle** is scored on the server, so a win is trusted.
+- **Catch, Crush, and Slice** run in the browser. `/api/play/finish` rejects results that real play can't produce: too fast for the time played (`src/rewards/server/missions.ts`). Someone scripting the API can still fake a result. Size the reward with that in mind.
+
+### Setup (once per environment)
+
+1. Create a Supabase project and run `supabase/migrations/0001_rewards.sql` in its SQL editor.
+2. **Authentication → Providers → Email**: enable it. Then edit **Email Templates → Magic Link** to include `{{ .Token }}`, so the email carries the 6-digit code. Supabase's built-in mailer is heavily rate-limited, so set up custom SMTP (Resend, SendGrid, …) before launch.
+3. **Authentication → Providers → Google**: optional. Add the Google OAuth client ID and secret.
+4. **Authentication → URL Configuration**: set the Site URL and add `https://<your-domain>/auth/callback` to the Redirect URLs.
+5. Set the four environment variables (see `.env.example`) in Vercel and redeploy.
+
+### Promotion settings
+
+Edit `src/rewards/config.ts`:
+
+- **Mission targets, reward text, terms, expiry, and display seconds**: placeholders until the business confirms them.
+  - While `draft: true`, every screen that shows them carries a **Sample terms · not final** badge.
+  - Set `draft: false` only after sign-off.
+- **`stores`**: empty, so the store list says it isn't confirmed yet. Add `{ name, address, mapsUrl?, hours? }` entries.
+- **`termsUrl` / `privacyUrl`**: when set, they are linked under the sign-in form.
+- **Changing `id`** starts a new promotion, and every account can earn one coupon again.
+
+### Measuring
+
+Events go to the `events` table: `game_start`, `game_complete`, `mission_achieved`, `coupon_issued`, `store_click`, `qr_execute`, plus screen views. `store_click` and `qr_execute` are attributed to the game that earned the coupon.
+
+```sql
+select * from reward_funnel_by_game;
+```
+
+This shows which games lead to in-store **use attempts**. Discounts actually applied need POS data.
 
 ## Known limitations
 
-- Wordle still uses the original's single fixed answer, because the source game had no word schedule yet. To rotate answers, set `ANSWER` in `src/games/wordle/server/game.ts` from a schedule.
+- Wordle still uses the original's single fixed answer, because the source game had no word schedule yet. To rotate answers, set `ANSWER` in `src/games/wordle/server/game.ts` from a schedule. **With rewards on, this makes the Wordle mission trivial for anyone who knows the word.** Rotate the answer or disable the Wordle mission (`missions.wordle: null`) before launch.
+- A mission claim belongs to the browser that played it. Signing in on a different browser, for example after switching out of Instagram, can't use it. The claim page doesn't offer the switch.
+- There is no rate limiting on `/api/play/*` or `/api/events` beyond Supabase's own limits.
 - Wordle is one word per day. **Play Again** stays disabled until the next word unlocks, and the result card shows a countdown to it.

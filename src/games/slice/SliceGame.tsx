@@ -8,6 +8,9 @@ import { StartScreen, type Rule } from '@/components/arcade/StartScreen';
 import { StatBar } from '@/components/arcade/StatBar';
 import { GameThumbnail } from '@/components/arcade/Thumbnails';
 import { getGame } from '@/games/registry';
+import { usePlaySession } from '@/rewards/client/hooks';
+import { MissionCard } from '@/rewards/ui/MissionCard';
+import { MissionResult } from '@/rewards/ui/MissionResult';
 import { ItemIcon } from './ItemIcon';
 import {
   COMBO_MIN,
@@ -56,6 +59,8 @@ type Outcome = SliceResult & { best: number; newBest: boolean };
 
 export default function SliceGame() {
   const game = getGame('slice');
+  const mission = usePlaySession('slice');
+  const { finish: finishMission } = mission;
   const [view, setView] = useState<'start' | 'game'>('start');
   const [muted, setMuted] = useState(false);
   const [best, setBest] = useState(0);
@@ -95,6 +100,7 @@ export default function SliceGame() {
         onCountdown: setCountdown,
         onPause: setPaused,
         onEnd: (r) => {
+          void finishMission({ score: r.score });
           const prev = readBest();
           const newBest = r.score > prev;
           if (newBest) {
@@ -122,7 +128,7 @@ export default function SliceGame() {
       engineRef.current = null;
       delete (window as unknown as { __slice?: SliceEngine }).__slice;
     };
-  }, [view]);
+  }, [view, finishMission]);
 
   // No page scrolling or overscroll while a round is on screen.
   useEffect(() => {
@@ -146,6 +152,7 @@ export default function SliceGame() {
 
   const play = () => {
     soundRef.current?.unlock(); // inside the click, so audio is allowed
+    mission.begin();
     setOutcome(null);
     setPaused(false);
     setScore(0);
@@ -176,6 +183,7 @@ export default function SliceGame() {
               Your best score <b>{best}</b>
             </p>
           )}
+          <MissionCard game="slice" />
         </StartScreen>
       </GameShell>
     );
@@ -232,6 +240,7 @@ export default function SliceGame() {
           actions={[{ label: 'Play Again', onClick: play }]}
         >
           <img className="slice-cup" src={outcome.cupImage} alt="Your froyo cup with the fruit you sliced on top" />
+          <MissionResult game="slice" outcome={mission.outcome} />
         </ResultSheet>
       )}
     </GameShell>
