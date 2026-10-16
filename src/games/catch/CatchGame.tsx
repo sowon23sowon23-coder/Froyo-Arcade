@@ -22,7 +22,8 @@ const CHARACTERS: { id: CharId; label: string }[] = [
 ];
 
 const ASSET = (name: string) => `/catch/${name}`;
-const SOCCER_BALL_IMAGE = 'soccer-ball.png';
+// The extra-life item is an emoji, not an image; it shares the `image` slot as a marker.
+const LIFE_EMOJI = '❤️';
 const FREE_HEART_SPAWN_CHANCE = 0.08;
 const FREE_HEART_MIN_INTERVAL_MS = 7000;
 const FREE_HEART_MAX_ACTIVE = 1;
@@ -119,12 +120,8 @@ const RULES: Rule[] = [
     title: 'Catch toppings',
     text: 'Every topping you catch is worth 1 point.',
   },
-  { icon: '❤️', title: 'Watch your lives', text: 'You start with 3 lives and lose one for each topping you miss.' },
-  {
-    icon: <img src={ASSET(SOCCER_BALL_IMAGE)} alt="" />,
-    title: 'Grab the soccer ball',
-    text: 'Catch a soccer ball to earn an extra life.',
-  },
+  { icon: '💔', title: 'Watch your lives', text: 'You start with 3 lives and lose one for each topping you miss.' },
+  { icon: LIFE_EMOJI, title: 'Grab the heart', text: 'Catch a falling heart to earn an extra life.' },
   { icon: '⚡', title: 'Level up', text: 'Every 10 points, toppings fall faster and more drop at once.' },
 ];
 
@@ -208,7 +205,7 @@ export default function CatchGame() {
     if (saved && CHARACTERS.some((c) => c.id === saved)) setCharacter(saved);
     setBest(Number(readStorage(BEST_KEY) || 0));
     // Warm the cache so the first toppings don't pop in.
-    for (const name of [...FALLING_ITEMS, SOCCER_BALL_IMAGE, 'game-bg.webp']) {
+    for (const name of FALLING_ITEMS) {
       const img = new Image();
       img.decoding = 'async';
       img.src = ASSET(name);
@@ -477,7 +474,7 @@ export default function CatchGame() {
     spawnRef.current = window.setInterval(() => {
       setItems((currentItems) => {
         const nowMs = Date.now();
-        const activeHeartCount = currentItems.filter((item) => item.image === SOCCER_BALL_IMAGE).length;
+        const activeHeartCount = currentItems.filter((item) => item.image === LIFE_EMOJI).length;
         const canSpawnHeartByInterval = nowMs - lastHeartSpawnAtRef.current >= FREE_HEART_MIN_INTERVAL_MS;
         const shouldSpawnHeart =
           canSpawnHeartByInterval && activeHeartCount < FREE_HEART_MAX_ACTIVE && Math.random() < FREE_HEART_SPAWN_CHANCE;
@@ -489,7 +486,7 @@ export default function CatchGame() {
 
         for (let i = 0; i < spawnCount; i += 1) {
           const baseFallSpeed = FREE_BASE_FALL_SPEED_MIN + Math.random() * FREE_BASE_FALL_SPEED_RANGE;
-          const image = shouldSpawnHeart ? SOCCER_BALL_IMAGE : pickRandomFallingImage(burstImages);
+          const image = shouldSpawnHeart ? LIFE_EMOJI : pickRandomFallingImage(burstImages);
           burstImages.push(image);
           nextItems.push({ id: idRef.current++, x: Math.random() * 90 + 5, y: -5 - i * 3.2, v: baseFallSpeed, image });
         }
@@ -514,7 +511,7 @@ export default function CatchGame() {
           const ny = item.y + item.v * freeSpeedMultiplier(scoreRef.current);
           const inCatchRangeX = Math.abs(item.x - px) <= CATCH_HALF_WIDTH_PCT;
           const inCatchRangeY = ny >= CATCH_Y_START_PCT && ny <= 96;
-          const isHeart = item.image === SOCCER_BALL_IMAGE;
+          const isHeart = item.image === LIFE_EMOJI;
 
           if (inCatchRangeX && inCatchRangeY) {
             if (isHeart) {
@@ -649,13 +646,9 @@ export default function CatchGame() {
               value: (
                 <span key={lifeBump} className={`catch-lives${lifeBump ? ' bump' : ''}`}>
                   {Array.from({ length: MAX_LIVES }).map((_, i) => (
-                    <img
-                      key={i}
-                      src={ASSET(SOCCER_BALL_IMAGE)}
-                      alt=""
-                      className={i < visibleLives ? '' : 'spent'}
-                      draggable={false}
-                    />
+                    <i key={i} aria-hidden="true" className={i < visibleLives ? '' : 'spent'}>
+                      {LIFE_EMOJI}
+                    </i>
                   ))}
                   {extraLives > 0 && <b>×{extraLives}</b>}
                   <span className="sr-only">{lives} lives</span>
@@ -698,12 +691,18 @@ export default function CatchGame() {
 
           {items.map((item) => (
             <div key={item.id} className="catch-item" style={{ left: `${item.x}%`, top: `${item.y}%` }}>
-              <img
-                src={ASSET(item.image)}
-                alt=""
-                draggable={false}
-                style={{ transform: `scale(${imageScaleBoost(item.image)})` }}
-              />
+              {item.image === LIFE_EMOJI ? (
+                <span className="catch-emoji" aria-hidden="true">
+                  {LIFE_EMOJI}
+                </span>
+              ) : (
+                <img
+                  src={ASSET(item.image)}
+                  alt=""
+                  draggable={false}
+                  style={{ transform: `scale(${imageScaleBoost(item.image)})` }}
+                />
+              )}
             </div>
           ))}
 

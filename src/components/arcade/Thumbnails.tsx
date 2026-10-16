@@ -9,7 +9,7 @@ function CatchThumb() {
     { src: 'kiwi', left: '70%', top: '10%', rotate: 10 },
     { src: 'gummy-bear', left: '40%', top: '30%', rotate: 6 },
     { src: 'cookie', left: '78%', top: '44%', rotate: -8 },
-    { src: 'soccer-ball', left: '20%', top: '52%', rotate: 0 },
+    { src: 'mango', left: '20%', top: '52%', rotate: 0 },
   ];
   return (
     <div className="thumb thumb-catch">

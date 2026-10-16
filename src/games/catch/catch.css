@@ -80,13 +80,14 @@
   gap: 2px;
 }
 
-.catch-lives img {
-  width: 18px;
-  height: 18px;
+.catch-lives i {
+  font-size: 15px;
+  font-style: normal;
+  line-height: 1;
   transition: opacity var(--dur) var(--ease), filter var(--dur) var(--ease);
 }
 
-.catch-lives img.spent {
+.catch-lives i.spent {
   opacity: 0.22;
   filter: grayscale(1);
 }
@@ -110,7 +111,7 @@
   overflow: hidden;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  background: #7cc8f5 url('/catch/game-bg.webp') center / cover no-repeat;
+  background: var(--surface);
   box-shadow: var(--shadow-md);
   touch-action: none;
   user-select: none;
@@ -122,14 +123,6 @@
     width: min(430px, calc(var(--avail-h) * 0.5625));
     aspect-ratio: 9 / 16;
   }
-}
-
-.catch-area::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18));
-  pointer-events: none;
 }
 
 .catch-area.shake {
@@ -159,9 +152,9 @@
   position: absolute;
   z-index: 10;
   height: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--brand-weak-2);
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--brand-weak);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
@@ -267,6 +260,11 @@
 .catch-item img {
   width: 32px;
   height: 32px;
+}
+
+.catch-item .catch-emoji {
+  font-size: 28px;
+  line-height: 1;
 }
 
 .catch-pop {

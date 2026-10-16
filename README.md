@@ -94,7 +94,7 @@ public/
 
 - **Froyo Catch** keeps the Free Play rules, speeds, and scoring:
   - 3 lives; a missed topping costs one.
-  - A soccer ball adds one life.
+  - A heart (❤️) adds one life.
   - The level rises every 10 points, and toppings fall faster with more drops at once.
   - Mouse and touch-drag controls work as before.
   - Best score and the chosen cup are saved in `localStorage`.
