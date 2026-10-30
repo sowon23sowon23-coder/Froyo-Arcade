@@ -1,4 +1,5 @@
 import type { GameSlug } from '@/games/registry';
+import { rewardFor } from '@/rewards/config';
 import { anonId } from '@/rewards/server/anon';
 import { logEvent } from '@/rewards/server/events';
 import { UUID, json, readBody } from '@/rewards/server/http';
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
   // One claim per session, so replaying cleared Crush levels doesn't pile them up.
   const { data: prior } = await db.from('mission_claims').select('id').eq('play_session_id', session.id).maybeSingle();
-  if (prior) return json<MissionOutcome>({ state: 'achieved', claimId: prior.id as string });
+  if (prior) return json<MissionOutcome>({ state: 'achieved', claimId: prior.id as string, reward: rewardFor(game, verdict.summary) });
 
   return json<MissionOutcome>(
     await createClaim({ game, anonId: anon, playSessionId: session.id, result: verdict.summary })

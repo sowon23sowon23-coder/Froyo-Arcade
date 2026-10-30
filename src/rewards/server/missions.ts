@@ -1,6 +1,6 @@
 import 'server-only';
 import type { GameSlug } from '@/games/registry';
-import { PROMOTION } from '../config';
+import { PROMOTION, rewardFor } from '../config';
 import type { MissionOutcome } from '../types';
 import { logEvent } from './events';
 import { admin } from './supabase';
@@ -35,7 +35,8 @@ export function judge(game: GameSlug, result: PlayResult, elapsedMs: number): Ve
   if (game === 'catch') {
     if (!isCount(result.score)) return { plausible: false, achieved: false, summary: {} };
     const plausible = result.score <= seconds * CATCH_MAX_POINTS_PER_SECOND + 3;
-    return { plausible, achieved: plausible && !!m.catch && result.score >= m.catch.score, summary: { score: result.score } };
+    const lowest = m.catch?.tiers[0]?.score;
+    return { plausible, achieved: plausible && lowest !== undefined && result.score >= lowest, summary: { score: result.score } };
   }
 
   if (game === 'slice') {
@@ -75,5 +76,5 @@ export async function createClaim(input: {
   if (error || !data) return { state: 'error' };
 
   logEvent({ type: 'mission_achieved', game: input.game, anonId: input.anonId, meta: input.result });
-  return { state: 'achieved', claimId: data.id as string };
+  return { state: 'achieved', claimId: data.id as string, reward: rewardFor(input.game, input.result) };
 }

@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { PROMOTION } from '../config';
 import { useRewards } from '../client/hooks';
 import { claimHref, readPendingClaim, type PendingClaim } from '../client/pending';
+import { canUpgrade } from '../format';
 import { SampleBadge } from './SampleBadge';
 import './rewards.css';
 
@@ -53,7 +53,19 @@ export function RewardsBanner() {
   const coupon = me.coupon;
 
   let status: React.ReactNode;
-  if (coupon?.status === 'available' || coupon?.status === 'showing') {
+  if (pending && (!coupon || (canUpgrade(coupon) && pending.percentOff > coupon.percentOff))) {
+    status = (
+      <Link className="btn btn-sm btn-primary" href={claimHref(pending.claimId)}>
+        {coupon ? 'New high score · Upgrade your reward' : 'Mission complete · Claim your reward'}
+      </Link>
+    );
+  } else if (coupon?.status === 'waiting') {
+    status = (
+      <Link className="btn btn-sm btn-primary" href="/rewards">
+        Reward saved · See when you can use it
+      </Link>
+    );
+  } else if (coupon?.status === 'available' || coupon?.status === 'showing') {
     status = (
       <Link className="btn btn-sm btn-primary" href="/rewards">
         Your reward is ready · My Rewards
@@ -61,12 +73,6 @@ export function RewardsBanner() {
     );
   } else if (coupon) {
     status = <span className="rw-banner-note">You&apos;ve received this promotion&apos;s reward. Keep playing for fun!</span>;
-  } else if (pending) {
-    status = (
-      <Link className="btn btn-sm btn-primary" href={claimHref(pending.claimId)}>
-        Mission complete · Claim your reward
-      </Link>
-    );
   }
 
   return (
@@ -75,8 +81,7 @@ export function RewardsBanner() {
         <span className="eyebrow">Froyo Rewards</span>
         <h2>Play any game. Hit its mission. Get a reward.</h2>
         <p>
-          Complete one game&apos;s reward mission to earn {PROMOTION.reward.title}. You only need one game. One reward per
-          account.
+          Complete one game&apos;s reward mission to earn a discount. You only need one game. One reward per account.
         </p>
         <SampleBadge />
       </div>

@@ -12,9 +12,15 @@ export function rewardsConfigured(): boolean {
   return Boolean(SUPABASE_URL && ANON_KEY && SERVICE_KEY);
 }
 
-/** The shared in-store QR payload. Server-only: it reaches a browser only while that coupon's QR is showing. */
-export function storeQrValue(): string | null {
-  return process.env.STORE_QR_VALUE?.trim() || null;
+/**
+ * The in-store QR payload for a reward. Each discount has its own fixed QR,
+ * because scanning it is what applies that discount at the POS: STORE_QR_VALUE_10
+ * for 10% off, and so on. STORE_QR_VALUE is for rewards without a percentage.
+ * Server-only: it reaches a browser only while that coupon's QR is showing.
+ */
+export function storeQrValue(percentOff: number | null | undefined): string | null {
+  const name = percentOff ? `STORE_QR_VALUE_${percentOff}` : 'STORE_QR_VALUE';
+  return process.env[name]?.trim() || null;
 }
 
 /** Supabase client bound to the visitor's auth cookies (route handlers only). */

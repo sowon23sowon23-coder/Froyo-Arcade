@@ -263,7 +263,7 @@ export default function WordleGame() {
       setFinished(true);
       setAnswer(res.answer);
       setMission(res.mission);
-      if (res.mission.state === 'achieved') savePendingClaim(res.mission.claimId, 'wordle');
+      if (res.mission.state === 'achieved') savePendingClaim(res.mission.claimId, 'wordle', res.mission.reward.percentOff);
       setToday((t) => (t ? { ...t, status: res.status, attempts: res.attempt } : t));
       later(() => setShowResult(true), 1100);
     }

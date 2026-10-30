@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import type { GameSlug } from '@/games/registry';
-import { PROMOTION, missionText } from '../config';
+import { PROMOTION, catchTiers, missionText } from '../config';
 import { useRewards } from '../client/hooks';
+import { canUpgrade } from '../format';
 import { SampleBadge } from './SampleBadge';
 import './rewards.css';
 
@@ -13,7 +14,10 @@ export function MissionCard({ game }: { game: GameSlug }) {
   const text = missionText(game);
   if (!text || (me && !me.configured)) return null;
 
-  const hasReward = Boolean(me?.coupon);
+  const coupon = me?.coupon ?? null;
+  const tiers = game === 'catch' ? catchTiers() : [];
+  // With a reward already saved, only a game that can still raise it keeps showing its tiers.
+  const showTiers = tiers.length > 0 && (!coupon || canUpgrade(coupon));
 
   return (
     <section className="rw-mission card" aria-label="Reward mission">
@@ -26,15 +30,27 @@ export function MissionCard({ game }: { game: GameSlug }) {
           <b>{text}</b>
         </div>
       </div>
-      {hasReward ? (
+      {coupon ? (
         <p className="rw-mission-note">
-          You already have this promotion&apos;s reward. Games are always free to play.{' '}
+          You have {coupon.rewardTitle}.{' '}
+          {showTiers ? 'Score higher to upgrade it before you use it.' : 'Games are always free to play.'}{' '}
           <Link href="/rewards">My Rewards</Link>
         </p>
       ) : (
         <p className="rw-mission-note">
-          Earn {PROMOTION.reward.title}. Complete any one game&apos;s mission. One reward per account.
+          {tiers.length > 0 ? 'The higher you score, the bigger the discount.' : `Earn ${PROMOTION.reward.title}.`} Complete any
+          one game&apos;s mission. One reward per account.
         </p>
+      )}
+      {showTiers && (
+        <ul className="rw-tiers">
+          {tiers.map((tier) => (
+            <li key={tier.score}>
+              <span>{tier.score}+ points</span>
+              <b>{tier.title}</b>
+            </li>
+          ))}
+        </ul>
       )}
       <SampleBadge />
     </section>

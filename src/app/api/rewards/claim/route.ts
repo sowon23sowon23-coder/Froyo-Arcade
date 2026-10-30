@@ -17,7 +17,14 @@ export async function POST(request: Request) {
   try {
     const result = await redeemClaim(claimId, user.id, await anonId());
     if (!result.ok) return json<ClaimResponse>(result, result.reason === 'claim_expired' ? 410 : 404);
-    return json<ClaimResponse>({ ok: true, coupon: toView(result.row, Date.now()), newlyIssued: result.newlyIssued });
+    const now = Date.now();
+    return json<ClaimResponse>({
+      ok: true,
+      coupon: toView(result.row, now),
+      newlyIssued: result.newlyIssued,
+      upgraded: result.upgraded,
+      serverNow: new Date(now).toISOString(),
+    });
   } catch {
     return json<ClaimResponse>({ ok: false, reason: 'server' }, 500);
   }

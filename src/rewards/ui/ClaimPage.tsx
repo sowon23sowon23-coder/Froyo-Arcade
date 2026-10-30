@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GameShell } from '@/components/arcade/GameShell';
-import { PROMOTION } from '../config';
 import { claimReward, track } from '../client/api';
 import { useRewards } from '../client/hooks';
 import { clearPendingClaim } from '../client/pending';
@@ -66,7 +65,7 @@ export function ClaimPage() {
           </span>
           <h2>Mission complete!</h2>
           <p>
-            Sign in to save {PROMOTION.reward.title} to your account. Your result is kept while you sign in.
+            Sign in to save your reward to your account. Your result is kept while you sign in.
           </p>
           <SampleBadge />
         </div>
@@ -80,16 +79,24 @@ export function ClaimPage() {
       <>
         <div className="rw-intro">
           <span className="rw-big" aria-hidden="true">
-            {result.newlyIssued ? '🎁' : '🍨'}
+            {result.newlyIssued || result.upgraded ? '🎁' : '🍨'}
           </span>
-          <h2>{result.newlyIssued ? 'Saved to My Rewards' : "You've already received this reward"}</h2>
+          <h2>
+            {result.upgraded
+              ? `Upgraded to ${result.coupon.rewardTitle}`
+              : result.newlyIssued
+                ? 'Saved to My Rewards'
+                : 'Your reward stays as it is'}
+          </h2>
           <p>
-            {result.newlyIssued
-              ? 'At the store, open My Rewards and tap Use in store at the register.'
-              : 'Each account gets one reward per promotion, whichever game earned it. Your games are still free to play.'}
+            {result.upgraded
+              ? 'Your reward went up. Its dates stay the same.'
+              : result.newlyIssued
+                ? 'Once the countdown ends, open My Rewards at the store and hand your phone to staff at the register.'
+                : 'Each account has one reward per promotion, and this result did not raise it. Games are still free to play.'}
           </p>
         </div>
-        <CouponCard coupon={result.coupon} />
+        <CouponCard coupon={result.coupon} serverNow={result.serverNow} />
         <Link className="btn btn-primary btn-block" href="/rewards">
           Go to My Rewards
         </Link>

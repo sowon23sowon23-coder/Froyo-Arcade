@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import words from './allowed-guesses.json';
-import { PROMOTION } from '@/rewards/config';
+import { PROMOTION, rewardFor } from '@/rewards/config';
 import { anonId } from '@/rewards/server/anon';
 import { logEvent } from '@/rewards/server/events';
 import { createClaim } from '@/rewards/server/missions';
@@ -82,7 +82,7 @@ function missionOf(state: SavedState, status: GameStatus): MissionOutcome {
   if (status === 'lost') return { state: 'missed' };
   if (status !== 'won') return { state: 'off' };
   if (state.g.length > mission.maxAttempts) return { state: 'missed' };
-  return state.m ? { state: 'achieved', claimId: state.m } : { state: 'error' };
+  return state.m ? { state: 'achieved', claimId: state.m, reward: rewardFor('wordle', {}) } : { state: 'error' };
 }
 
 export async function getToday(): Promise<TodayResponse> {

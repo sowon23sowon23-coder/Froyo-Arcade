@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import type { GameSlug } from '@/games/registry';
-import { PROMOTION, missionText } from '../config';
+import { missionText } from '../config';
 import { useRewards } from '../client/hooks';
 import { claimHref } from '../client/pending';
+import { canUpgrade } from '../format';
 import type { MissionOutcome } from '../types';
 import './rewards.css';
 
@@ -31,11 +32,17 @@ export function MissionResult({
   }
 
   if (outcome.state === 'achieved') {
-    if (me?.coupon) {
+    const { reward } = outcome;
+    const coupon = me?.coupon ?? null;
+    if (coupon && !(canUpgrade(coupon) && reward.percentOff > coupon.percentOff)) {
       return (
         <div className="rw-result is-done">
           <b>Mission complete!</b>
-          <span>You already have this promotion&apos;s reward, so no new one is issued.</span>
+          <span>
+            {canUpgrade(coupon)
+              ? `Your ${coupon.rewardTitle} reward stays as it is. Each account has one reward.`
+              : "You've already used or passed this promotion's reward, so it can't change."}
+          </span>
           <Link className="btn btn-sm btn-secondary" href="/rewards">
             My Rewards
           </Link>
@@ -44,10 +51,19 @@ export function MissionResult({
     }
     return (
       <div className="rw-result is-won">
-        <b>🎁 Mission complete!</b>
-        <span>Claim {PROMOTION.reward.title}. We&apos;ll keep this result while you sign in.</span>
+        <b>🎁 Mission complete: {reward.title}</b>
+        {coupon ? (
+          <span>This beats your {coupon.rewardTitle} reward. Upgrading keeps the same dates.</span>
+        ) : (
+          <span>We&apos;ll keep this result while you sign in.</span>
+        )}
+        {reward.next && (
+          <span className="rw-result-warn">
+            Keep playing: score {reward.next.score} for {reward.next.title}. You can upgrade until you open the in-store QR.
+          </span>
+        )}
         <Link className="btn btn-primary btn-block" href={claimHref(outcome.claimId)}>
-          Claim your reward
+          {coupon ? `Upgrade to ${reward.title}` : `Claim ${reward.title}`}
         </Link>
       </div>
     );

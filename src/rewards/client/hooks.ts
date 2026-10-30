@@ -63,7 +63,7 @@ export function usePlaySession(game: GameSlug) {
         return;
       }
       const next = await finishPlay(sessionId, result);
-      if (next.state === 'achieved') savePendingClaim(next.claimId, game);
+      if (next.state === 'achieved') savePendingClaim(next.claimId, game, next.reward.percentOff);
       setOutcome(next);
     },
     [game]

@@ -39,7 +39,8 @@ Copy `.env.example` to `.env.local`. Every variable is optional: with none set, 
 | `NEXT_PUBLIC_SUPABASE_URL`      | Rewards: Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Rewards: sign-in from the browser |
 | `SUPABASE_SERVICE_ROLE_KEY`     | Rewards: server-only database access. Never expose it |
-| `STORE_QR_VALUE`                | The shared in-store QR payload. Until it's set, **Use in store** stays disabled |
+| `STORE_QR_VALUE_10`, `_15`, `_25`, `_30`, `_35` | The fixed in-store QR payload for each discount. Until a value is set, **Use in store** stays disabled for that discount |
+| `STORE_QR_VALUE`                | The in-store QR payload for rewards without a percentage |
 | `WORDLE_SECRET`                 | Long random text that keeps future Wordle answers secret. Set it in production; changing it changes the answers, including today's |
 | `GAME_TIMEZONE`                 | When the Wordle day rolls over (default `America/Los_Angeles`) |
 
@@ -131,7 +132,7 @@ Still not carried over: leaderboards and admin tools. Rewards were rebuilt for t
 
 ## Rewards
 
-Complete **any one** game's mission and an account can save **one coupon per promotion**. The coupon is shown in store as the **shared, fixed QR** that stores already scan; each customer's coupon record only controls whether *their* screen may show it.
+Complete **any one** game's mission and an account can save **one coupon per promotion**. Each discount has its own **fixed QR**, and scanning it applies that discount at the POS. All customers with the same discount see the same QR; each customer's coupon record only controls whether *their* screen may show it.
 
 ### Flow
 
@@ -141,29 +142,32 @@ Complete **any one** game's mission and an account can save **one coupon per pro
 4. **Claim your reward** opens `/rewards/claim`. If the player isn't signed in, they sign in there and the claim is kept.
    - Email 6-digit code is the main method. It works inside Instagram's browser and never leaves the page.
    - **Continue with Google** appears only in a regular browser, because Google blocks sign-in in in-app browsers.
-5. The server issues the coupon, or returns the existing one: the database allows one per account per promotion.
-6. In store: **My Rewards** → **Use in store** → confirm → the QR shows for `qrDisplaySeconds` (10 by default), then disappears for good.
+5. The server issues the coupon, upgrades the existing one if this result pays more, or returns it unchanged: the database allows one per account per promotion.
+6. The coupon can be used from `activationHours` (24) after it is issued, for `validDays` (7). **My Rewards** counts down to each of those moments on the server's clock.
+7. In store: the customer opens **My Rewards** and hands their phone to staff. Staff tap **Staff only: Use in store** → **Staff: Show QR now**, and the QR for that coupon's discount shows for `qrDisplaySeconds` (15), then disappears for good. The site can't verify who taps: this relies on the on-screen instructions and store practice.
+8. Used and expired coupons, from any promotion, stay listed under **Used and expired rewards** in **My Rewards**, without a QR.
 
 ### Coupon states
 
 | State       | Meaning |
 | ----------- | ------- |
-| `available` | Saved, not opened in store |
+| `waiting`   | Saved, but its usable period hasn't started |
+| `available` | Usable now, not opened in store |
 | `showing`   | The QR is on screen now (inside the display window) |
 | `shown`     | The QR was opened and its window ended. This is a **use attempt**, not a confirmed discount: the POS doesn't report back |
 | `expired`   | Passed its expiry date without being opened |
 
-The state is never stored. It is derived from `issued_at`, `expires_at`, and `qr_executed_at` against the server clock.
+The state is never stored. It is derived from `valid_from`, `expires_at`, and `qr_executed_at` against the server clock.
 
 ### How the one-time QR is enforced
 
-- `execute_coupon_qr` (in the migration) sets `qr_executed_at = now()` in one `UPDATE … WHERE qr_executed_at IS NULL`.
+- `execute_coupon_qr` (in the migrations) sets `qr_executed_at = now()` in one `UPDATE … WHERE qr_executed_at IS NULL`, and only inside the coupon's usable period.
   - Concurrent taps or devices serialize on the row lock. Only the first sets the time; the rest get the original time back.
 - Refresh, back, reopen, or another device all read the same `qr_executed_at`, so they only show what is left of the same window.
-- Nothing is written if the request never reaches the database, if the coupon is expired, or if `STORE_QR_VALUE` is unset. In those cases the coupon stays `available`.
-- `STORE_QR_VALUE` is server-only. It is sent to a browser only while that browser's coupon is `showing`.
+- Nothing is written if the request never reaches the database, if the coupon is outside its usable period, or if the QR value for its discount is unset.
+- The `STORE_QR_VALUE*` variables are server-only. A browser receives only the QR for its own coupon's discount, and only while that coupon is `showing`.
 - The QR screen shows a ticking clock, a pulsing dot, and the coupon code so staff can tell a live screen from a screenshot.
-  - **This does not stop copying of the shared QR itself.** That QR never expires, so anyone who photographs it can reuse it. Only staff checking for a live screen, or a POS integration, closes that gap.
+  - **This does not stop copying a QR itself.** Each QR is fixed and never expires, and scanning one applies its discount automatically, so anyone who photographs the 35% QR can reuse it. Only staff checking for a live screen, or a POS integration, closes that gap.
 
 ### Mission checks
 
@@ -172,11 +176,11 @@ The state is never stored. It is derived from `issued_at`, `expires_at`, and `qr
 
 ### Setup (once per environment)
 
-1. Create a Supabase project and run `supabase/migrations/0001_rewards.sql` in its SQL editor.
+1. Create a Supabase project and run each file in `supabase/migrations/`, in order, in its SQL editor.
 2. **Authentication → Providers → Email**: enable it. Then edit **Email Templates → Magic Link** to include `{{ .Token }}`, so the email carries the 6-digit code. Supabase's built-in mailer is heavily rate-limited, so set up custom SMTP (Resend, SendGrid, …) before launch.
 3. **Authentication → Providers → Google**: optional. Add the Google OAuth client ID and secret.
 4. **Authentication → URL Configuration**: set the Site URL and add `https://<your-domain>/auth/callback` to the Redirect URLs.
-5. Set the four environment variables (see `.env.example`) in Vercel and redeploy.
+5. Set the environment variables (see `.env.example`) in Vercel and redeploy.
 
 ### Promotion settings
 
@@ -188,6 +192,14 @@ Edit `src/rewards/config.ts`:
 - **`stores`**: empty, so the store list says it isn't confirmed yet. Add `{ name, address, mapsUrl?, hours? }` entries.
 - **`termsUrl` / `privacyUrl`**: when set, they are linked under the sign-in form.
 - **Changing `id`** starts a new promotion, and every account can earn one coupon again.
+
+### Froyo Catch discount tiers
+
+`missions.catch.tiers` in `config.ts` sets the discount by score in one run. Every discount applies to one cup. The coupon stores its reward and dates (migration `0002`), so later config changes don't alter it.
+
+A better result upgrades the coupon through `upgrade_coupon`, which only ever raises the reward and refuses once the QR is opened or the coupon has expired. Upgrading keeps the coupon's dates: it doesn't restart the 24-hour wait or extend the 7 days.
+
+To add a tier, also set its `STORE_QR_VALUE_<percent>` variable.
 
 ### Measuring
 

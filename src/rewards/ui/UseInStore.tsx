@@ -16,14 +16,17 @@ export function ConfirmSheet({ busy, onConfirm, onCancel }: { busy: boolean; onC
         <div className="sheet-icon" aria-hidden="true">
           🏪
         </div>
-        <h2 id="rw-confirm-title">Ready at the register?</h2>
+        <h2 id="rw-confirm-title">Staff only</h2>
         <p className="sheet-message">
-          Tap <b>Show QR now</b> only when staff are ready to scan. The QR stays on screen for{' '}
+          <b>Customer:</b> please hand your phone to staff.
+        </p>
+        <p className="sheet-message">
+          <b>Staff:</b> tap <b>Show QR now</b> when your scanner is ready. The QR stays on screen for{' '}
           <b>{PROMOTION.qrDisplaySeconds} seconds</b> and <b>can&apos;t be opened again</b>.
         </p>
         <div className="sheet-actions">
           <button ref={confirmRef} type="button" className="btn btn-block btn-primary" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Opening…' : 'Show QR now'}
+            {busy ? 'Opening…' : 'Staff: Show QR now'}
           </button>
           <button type="button" className="btn btn-block btn-ghost" onClick={onCancel} disabled={busy}>
             Not yet
@@ -52,12 +55,14 @@ function clockText(ms: number): string {
 export function QrOverlay({
   value,
   code,
+  rewardTitle,
   showUntilMs,
   offsetMs,
   onEnd,
 }: {
   value: string;
   code: string;
+  rewardTitle: string;
   showUntilMs: number;
   offsetMs: number;
   onEnd: () => void;
@@ -99,8 +104,8 @@ export function QrOverlay({
   return (
     <div className="rw-qr-overlay" role="dialog" aria-modal="true" aria-labelledby="rw-qr-title">
       <div className="rw-qr-card">
-        <h2 id="rw-qr-title">Show this to staff</h2>
-        <p className="rw-muted">{PROMOTION.reward.title}</p>
+        <h2 id="rw-qr-title">Staff: scan this QR</h2>
+        <p className="rw-qr-reward">{rewardTitle}</p>
         <div className="rw-qr-frame">
           <QrCode value={value} label="Store QR code" />
         </div>

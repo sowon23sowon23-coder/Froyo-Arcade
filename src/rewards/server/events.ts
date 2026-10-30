@@ -8,6 +8,7 @@ export type EventType =
   | 'game_complete'
   | 'mission_achieved'
   | 'coupon_issued'
+  | 'coupon_upgraded'
   | 'qr_execute'
   | 'store_click'
   | 'rewards_view'

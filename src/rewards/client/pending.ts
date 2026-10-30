@@ -8,11 +8,13 @@ import type { GameSlug } from '@/games/registry';
 const KEY = 'froyo-arcade:pending-claim';
 const TTL_MS = 24 * 60 * 60 * 1000;
 
-export type PendingClaim = { claimId: string; game: GameSlug; at: number };
+export type PendingClaim = { claimId: string; game: GameSlug; at: number; percentOff: number };
 
-export function savePendingClaim(claimId: string, game: GameSlug): void {
+export function savePendingClaim(claimId: string, game: GameSlug, percentOff: number): void {
+  // A lower score later must not replace the better result still waiting to be claimed.
+  if ((readPendingClaim()?.percentOff ?? -1) > percentOff) return;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ claimId, game, at: Date.now() } satisfies PendingClaim));
+    localStorage.setItem(KEY, JSON.stringify({ claimId, game, at: Date.now(), percentOff } satisfies PendingClaim));
   } catch {
     // Storage blocked: the result screen's claim button still works.
   }

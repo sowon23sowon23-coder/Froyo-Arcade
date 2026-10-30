@@ -3,25 +3,24 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { GameShell } from '@/components/arcade/GameShell';
-import { PROMOTION } from '../config';
 import { executeQr, track } from '../client/api';
 import { useRewards } from '../client/hooks';
 import { claimHref, readPendingClaim, type PendingClaim } from '../client/pending';
 import { browserAuth } from '../client/supabase';
-import { formatDateTime } from '../format';
+import { canUpgrade, formatDateTime } from '../format';
 import type { RewardsMe } from '../types';
-import { CouponCard, RewardTerms } from './CouponCard';
+import { CouponCard, PastRewards, RewardTerms } from './CouponCard';
 import { SignIn } from './SignIn';
 import { StoreList } from './StoreList';
 import { ConfirmSheet, QrOverlay } from './UseInStore';
 import './rewards.css';
 
-type ActiveQr = { value: string; code: string; showUntilMs: number; offsetMs: number };
+type ActiveQr = { value: string; code: string; rewardTitle: string; showUntilMs: number; offsetMs: number };
 
 function activeFrom(me: RewardsMe | null): ActiveQr | null {
   const c = me?.coupon;
   if (!me || !c || c.status !== 'showing' || !me.qrValue || !c.showUntil) return null;
-  return { value: me.qrValue, code: c.code, showUntilMs: Date.parse(c.showUntil), offsetMs: Date.parse(me.serverNow) - Date.now() };
+  return { value: me.qrValue, code: c.code, rewardTitle: c.rewardTitle, showUntilMs: Date.parse(c.showUntil), offsetMs: Date.parse(me.serverNow) - Date.now() };
 }
 
 export function RewardsPage() {
@@ -59,6 +58,7 @@ export function RewardsPage() {
         setActive({
           value: res.qrValue,
           code: res.coupon.code,
+          rewardTitle: res.coupon.rewardTitle,
           showUntilMs: Date.parse(res.coupon.showUntil),
           offsetMs: Date.parse(res.serverNow) - Date.now(),
         });
@@ -76,6 +76,8 @@ export function RewardsPage() {
       setNotice(
         res.reason === 'qr_not_configured'
           ? "The in-store QR isn't set up yet. Your reward is still saved."
+          : res.reason === 'not_yet'
+            ? "This reward can't be used yet. Check the countdown above."
           : res.reason === 'expired'
             ? 'This reward has expired.'
             : "Couldn't open the QR. Your reward wasn't used. Try again."
@@ -131,7 +133,7 @@ export function RewardsPage() {
         <div className="card rw-empty">
           <b>No reward yet</b>
           <span>
-            Pick any game and complete its reward mission to earn {PROMOTION.reward.title}. One reward per account.
+            Pick any game and complete its reward mission to earn a discount. One reward per account.
           </span>
           {pending ? (
             <Link className="btn btn-primary" href={claimHref(pending.claimId)}>
@@ -146,11 +148,38 @@ export function RewardsPage() {
         <RewardTerms />
       </>
     );
+  } else if (coupon.status === 'shown' || coupon.status === 'expired') {
+    body = (
+      <>
+        <div className="card rw-empty">
+          <b>No active reward</b>
+          <span>
+            {coupon.status === 'shown'
+              ? "This promotion's reward has been used."
+              : "This promotion's reward has expired."}{' '}
+            Each account gets one reward per promotion. Games are always free to play.
+          </span>
+        </div>
+        <RewardTerms />
+      </>
+    );
   } else {
     const canUse = coupon.status === 'available' && me.qrConfigured;
     body = (
       <>
-        <CouponCard coupon={coupon} />
+        <CouponCard coupon={coupon} serverNow={me.serverNow} onTimerElapsed={() => void reload()} />
+
+        {pending && canUpgrade(coupon) && pending.percentOff > coupon.percentOff && (
+          <Link className="btn btn-primary btn-block" href={claimHref(pending.claimId)}>
+            Upgrade your reward with your new score
+          </Link>
+        )}
+
+        {coupon.status === 'waiting' && (
+          <p className="rw-fine rw-center">
+            The staff button opens when the countdown ends. Saving or viewing your reward does not open the QR.
+          </p>
+        )}
 
         {coupon.status === 'available' && (
           <div className="rw-use">
@@ -164,20 +193,14 @@ export function RewardsPage() {
                 setConfirming(true);
               }}
             >
-              Use in store
+              Staff only: Use in store
             </button>
             <p className="rw-fine">
               {me.qrConfigured
-                ? 'Tap this at the register, when you are ready to pay. Saving or viewing your reward does not open the QR.'
-                : "The in-store QR isn't set up yet. Your reward is saved and will be ready to use once it is."}
+                ? "Don't tap this yourself. Hand your phone to staff at the register, and they will open the QR. It works only once."
+                : "The in-store QR for this reward isn't set up yet. Your reward is saved and will be ready to use once it is."}
             </p>
           </div>
-        )}
-
-        {notice && (
-          <p className="rw-notice" role="status">
-            {notice}
-          </p>
         )}
 
         <StoreList sourceGame={coupon.sourceGame} />
@@ -189,7 +212,13 @@ export function RewardsPage() {
   return (
     <GameShell title="My Rewards" className="rewards">
       <div className="rw-page screen-in">
+        {notice && (
+          <p className="rw-notice" role="status">
+            {notice}
+          </p>
+        )}
         {body}
+        {me?.signedIn && <PastRewards coupons={me.history} />}
         {me?.signedIn && (
           <p className="rw-account">
             Signed in as {me.email ?? 'your account'} ·{' '}
