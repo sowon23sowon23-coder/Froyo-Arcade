@@ -48,9 +48,17 @@ export async function POST(request: Request) {
 
   if (!verdict.achieved) return json<MissionOutcome>({ state: 'missed' });
 
-  // One claim per session, so replaying cleared Crush levels doesn't pile them up.
-  const { data: prior } = await db.from('mission_claims').select('id').eq('play_session_id', session.id).maybeSingle();
-  if (prior) return json<MissionOutcome>({ state: 'achieved', claimId: prior.id as string, reward: rewardFor(game, verdict.summary) });
+  // Crush reports every level it clears on one session. Replaying a level reuses the
+  // best claim so far; only a result that pays more gets a new one, so the coupon
+  // matches what the result screen promises.
+  const { data: priors } = await db.from('mission_claims').select('id, result').eq('play_session_id', session.id);
+  const reward = rewardFor(game, verdict.summary);
+  const best = (priors ?? [])
+    .map((claim) => ({ id: claim.id as string, reward: rewardFor(game, (claim.result ?? {}) as PlayResult) }))
+    .sort((a, b) => b.reward.percentOff - a.reward.percentOff)[0];
+  if (best && best.reward.percentOff >= reward.percentOff) {
+    return json<MissionOutcome>({ state: 'achieved', claimId: best.id, reward: best.reward });
+  }
 
   return json<MissionOutcome>(
     await createClaim({ game, anonId: anon, playSessionId: session.id, result: verdict.summary })

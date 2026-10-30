@@ -115,7 +115,7 @@ export async function redeemClaim(claimId: string, userId: string, anon: string)
 
   const usable = !claim.redeemed_at && Date.now() - Date.parse(claim.achieved_at) <= CLAIM_TTL_MS;
   // From the server's saved result, never from anything the browser sends now.
-  const reward = rewardFor(claim.game as GameSlug, (claim.result ?? {}) as { score?: unknown });
+  const reward = rewardFor(claim.game as GameSlug, (claim.result ?? {}) as { score?: unknown; level?: unknown });
   const markRedeemed = () =>
     db.from('mission_claims').update({ user_id: userId, redeemed_at: new Date().toISOString() }).eq('id', claim.id);
 

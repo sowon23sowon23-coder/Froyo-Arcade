@@ -21,12 +21,12 @@ export type Store = {
 export type Missions = {
   /** Reach a tier's score in one run. Higher scores earn a bigger discount. List tiers lowest first. */
   catch: { tiers: { score: number; percentOff: number }[] } | null;
-  /** Clear this level (or any later one). */
-  crush: { level: number } | null;
-  /** Solve the word within this many tries. */
-  wordle: { maxAttempts: number } | null;
-  /** Reach this score in one 30-second round. */
-  slice: { score: number } | null;
+  /** Clear a tier's level (or any later one). List tiers lowest first. */
+  crush: { tiers: { level: number; percentOff: number }[] } | null;
+  /** Solve the word within this many tries, for one fixed discount. */
+  wordle: { maxAttempts: number; percentOff: number } | null;
+  /** Reach a tier's score in one 30-second round. List tiers lowest first. */
+  slice: { tiers: { score: number; percentOff: number }[] } | null;
 };
 
 const QR_DISPLAY_SECONDS = 15;
@@ -73,9 +73,24 @@ export const PROMOTION = {
         { score: 200, percentOff: 35 },
       ],
     },
-    crush: { level: 3 },
-    wordle: { maxAttempts: 6 },
-    slice: { score: 300 },
+    crush: {
+      tiers: [
+        { level: 3, percentOff: 10 },
+        { level: 5, percentOff: 15 },
+        { level: 10, percentOff: 25 },
+        { level: 15, percentOff: 30 },
+      ],
+    },
+    wordle: { maxAttempts: 6, percentOff: 10 },
+    slice: {
+      tiers: [
+        { score: 400, percentOff: 10 },
+        { score: 450, percentOff: 15 },
+        { score: 500, percentOff: 25 },
+        { score: 600, percentOff: 30 },
+        { score: 700, percentOff: 35 },
+      ],
+    },
   } satisfies Missions as Missions,
 
   /** Participating stores. Empty until the list is confirmed. */
@@ -93,11 +108,11 @@ export function missionText(game: GameSlug): string | null {
     case 'catch':
       return m.catch ? `Score ${m.catch.tiers[0]!.score} points or more in one run.` : null;
     case 'crush':
-      return m.crush ? `Clear Level ${m.crush.level}.` : null;
+      return m.crush ? `Clear Level ${m.crush.tiers[0]!.level}.` : null;
     case 'wordle':
       return m.wordle ? `Solve the word in ${m.wordle.maxAttempts} tries or fewer.` : null;
     case 'slice':
-      return m.slice ? `Score ${m.slice.score} points in one 30-second round.` : null;
+      return m.slice ? `Score ${m.slice.tiers[0]!.score} points or more in one 30-second round.` : null;
   }
 }
 
@@ -105,30 +120,49 @@ export type EarnedReward = {
   title: string;
   /** Percent off, or 0 for the default reward. Used to keep the better of two unclaimed results. */
   percentOff: number;
-  /** The next step up, when this game has one. */
-  next?: { score: number; title: string };
+  /** The next step up, when this game has one. `goal` reads as "score 450" or "clear Level 5". */
+  next?: { goal: string; title: string };
 };
 
 const percentTitle = (percentOff: number) => `${percentOff}% off 1 cup`;
 
-export function catchTiers() {
-  return (PROMOTION.missions.catch?.tiers ?? []).map((t) => ({ score: t.score, title: percentTitle(t.percentOff) }));
+/** A game's discount steps on one number: score for Catch and Slice, level for Crush. */
+function steps(game: GameSlug): { at: number; percentOff: number }[] {
+  const m = PROMOTION.missions;
+  if (game === 'catch') return (m.catch?.tiers ?? []).map((t) => ({ at: t.score, percentOff: t.percentOff }));
+  if (game === 'slice') return (m.slice?.tiers ?? []).map((t) => ({ at: t.score, percentOff: t.percentOff }));
+  if (game === 'crush') return (m.crush?.tiers ?? []).map((t) => ({ at: t.level, percentOff: t.percentOff }));
+  return [];
+}
+
+/** The discount steps a game shows, or an empty list if it pays one fixed reward. */
+export function tiersFor(game: GameSlug) {
+  return steps(game).map((s) => ({
+    goal: game === 'crush' ? `Level ${s.at}` : `${s.at}+ points`,
+    title: percentTitle(s.percentOff),
+  }));
 }
 
 /** What a mission result pays. Decided on the server when the coupon is issued, and stored with it. */
-export function rewardFor(game: GameSlug, result: { score?: unknown }): EarnedReward {
-  const tiers = PROMOTION.missions.catch?.tiers;
-  if (game === 'catch' && tiers && typeof result.score === 'number') {
-    const score = result.score;
-    const reached = tiers.filter((t) => score >= t.score).at(-1);
-    const next = tiers.find((t) => score < t.score);
-    return {
-      title: percentTitle(reached?.percentOff ?? 0),
-      percentOff: reached?.percentOff ?? 0,
-      ...(next ? { next: { score: next.score, title: percentTitle(next.percentOff) } } : {}),
-    };
+export function rewardFor(game: GameSlug, result: { score?: unknown; level?: unknown }): EarnedReward {
+  if (game === 'wordle') {
+    const percentOff = PROMOTION.missions.wordle?.percentOff ?? 0;
+    return percentOff ? { title: percentTitle(percentOff), percentOff } : { title: PROMOTION.reward.title, percentOff: 0 };
   }
-  return { title: PROMOTION.reward.title, percentOff: 0 };
+  const value = game === 'crush' ? result.level : result.score;
+  if (typeof value !== 'number') return { title: PROMOTION.reward.title, percentOff: 0 };
+
+  const reached = steps(game)
+    .filter((s) => value >= s.at)
+    .at(-1);
+  const next = steps(game).find((s) => value < s.at);
+  return {
+    title: percentTitle(reached?.percentOff ?? 0),
+    percentOff: reached?.percentOff ?? 0,
+    ...(next
+      ? { next: { goal: game === 'crush' ? `clear Level ${next.at}` : `score ${next.at}`, title: percentTitle(next.percentOff) } }
+      : {}),
+  };
 }
 
 export function directionsUrl(store: Store): string {

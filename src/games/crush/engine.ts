@@ -1233,20 +1233,6 @@ export function createCrushGame(root: HTMLElement, cb: CrushCallbacks) {
       clearSel();
       armed = null;
     },
-    addMoves() {
-      busy = false;
-      moves += 5;
-      syncHud();
-      showBanner('+5 MOVES!');
-      scheduleHint();
-    },
-    async shuffleAfterFail() {
-      busy = true;
-      await shuffleBoard();
-      await resolve();
-      busy = false;
-      void checkEnd();
-    },
     getState: () => state,
     setSound(onOff: boolean) {
       state.settings.sound = onOff;

@@ -42,14 +42,16 @@ export function judge(game: GameSlug, result: PlayResult, elapsedMs: number): Ve
   if (game === 'slice') {
     if (!isCount(result.score)) return { plausible: false, achieved: false, summary: {} };
     const plausible = seconds >= SLICE_MIN_SECONDS && result.score <= SLICE_MAX_SCORE;
-    return { plausible, achieved: plausible && !!m.slice && result.score >= m.slice.score, summary: { score: result.score } };
+    const lowest = m.slice?.tiers[0]?.score;
+    return { plausible, achieved: plausible && lowest !== undefined && result.score >= lowest, summary: { score: result.score } };
   }
 
   if (game === 'crush') {
     const level = result.level;
     if (!isCount(level) || level < 1 || level > CRUSH_LEVELS) return { plausible: false, achieved: false, summary: {} };
     const plausible = seconds >= CRUSH_MIN_SECONDS;
-    return { plausible, achieved: plausible && !!m.crush && level >= m.crush.level, summary: { level } };
+    const lowest = m.crush?.tiers[0]?.level;
+    return { plausible, achieved: plausible && lowest !== undefined && level >= lowest, summary: { level } };
   }
 
   return { plausible: false, achieved: false, summary: {} };

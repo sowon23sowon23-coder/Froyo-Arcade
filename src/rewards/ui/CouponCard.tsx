@@ -40,8 +40,8 @@ export function CouponCard({
           <dd className="rw-code">{coupon.code}</dd>
         </div>
       </dl>
-      {canUpgrade(coupon) && coupon.percentOff > 0 && (
-        <p className="rw-coupon-note">Score higher in Froyo Catch to upgrade this reward. Upgrades stop once you open the QR.</p>
+      {canUpgrade(coupon) && (
+        <p className="rw-coupon-note">A better game result can upgrade this reward. Upgrades stop once the QR is opened.</p>
       )}
     </article>
   );

@@ -59,7 +59,7 @@ export function MissionResult({
         )}
         {reward.next && (
           <span className="rw-result-warn">
-            Keep playing: score {reward.next.score} for {reward.next.title}. You can upgrade until you open the in-store QR.
+            Keep playing: {reward.next.goal} for {reward.next.title}. You can upgrade until the in-store QR is opened.
           </span>
         )}
         <Link className="btn btn-primary btn-block" href={claimHref(outcome.claimId)}>

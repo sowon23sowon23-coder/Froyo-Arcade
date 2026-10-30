@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { GameSlug } from '@/games/registry';
-import { PROMOTION, catchTiers, missionText } from '../config';
+import { missionText, rewardFor, tiersFor } from '../config';
 import { useRewards } from '../client/hooks';
 import { canUpgrade } from '../format';
 import { SampleBadge } from './SampleBadge';
@@ -15,7 +15,7 @@ export function MissionCard({ game }: { game: GameSlug }) {
   if (!text || (me && !me.configured)) return null;
 
   const coupon = me?.coupon ?? null;
-  const tiers = game === 'catch' ? catchTiers() : [];
+  const tiers = tiersFor(game);
   // With a reward already saved, only a game that can still raise it keeps showing its tiers.
   const showTiers = tiers.length > 0 && (!coupon || canUpgrade(coupon));
 
@@ -38,15 +38,15 @@ export function MissionCard({ game }: { game: GameSlug }) {
         </p>
       ) : (
         <p className="rw-mission-note">
-          {tiers.length > 0 ? 'The higher you score, the bigger the discount.' : `Earn ${PROMOTION.reward.title}.`} Complete any
+          {tiers.length > 0 ? 'The better you do, the bigger the discount.' : `Earn ${rewardFor(game, {}).title}.`} Complete any
           one game&apos;s mission. One reward per account.
         </p>
       )}
       {showTiers && (
         <ul className="rw-tiers">
           {tiers.map((tier) => (
-            <li key={tier.score}>
-              <span>{tier.score}+ points</span>
+            <li key={tier.goal}>
+              <span>{tier.goal}</span>
               <b>{tier.title}</b>
             </li>
           ))}

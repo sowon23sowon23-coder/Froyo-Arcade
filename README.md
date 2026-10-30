@@ -120,7 +120,8 @@ public/
   - The level rises every 10 points, and toppings fall faster with more drops at once.
   - Mouse and touch-drag controls work as before.
   - Best score and the chosen cup are saved in `localStorage`.
-- **Froyo Crush** keeps the same levels, matching, specials, ice, cookies, boosters (shuffle, bomb, spoon), "+5 moves", scoring, and star rating. Progress is saved in `localStorage`.
+- **Froyo Crush** keeps the same levels, matching, specials, ice, cookies, boosters (shuffle, bomb, spoon), scoring, and star rating. Progress is saved in `localStorage`.
+  - "+5 moves" and the free shuffle after a failed level were removed, so a reward level can't be cleared by continuing indefinitely. A failed level can only be played again.
   - One bug from the original was fixed: a swap made in the brief pause before the "Level complete" card could trigger a second clear, which marked the next level as cleared without playing it.
 - **Wordle** keeps the original rules:
   - Six tries, standard duplicate-letter scoring, and the same allowed-word list.
@@ -193,9 +194,9 @@ Edit `src/rewards/config.ts`:
 - **`termsUrl` / `privacyUrl`**: when set, they are linked under the sign-in form.
 - **Changing `id`** starts a new promotion, and every account can earn one coupon again.
 
-### Froyo Catch discount tiers
+### Discount tiers
 
-`missions.catch.tiers` in `config.ts` sets the discount by score in one run. Every discount applies to one cup. The coupon stores its reward and dates (migration `0002`), so later config changes don't alter it.
+`missions` in `config.ts` sets the discount for each game, and every discount applies to one cup: by score in one round for Catch and Slice, by level cleared for Crush (up to 30%), and one fixed discount for Wordle, because a player who clears cookies after losing can replay a word they have already seen. The coupon stores its reward and dates (migration `0002`), so later config changes don't alter it.
 
 A better result upgrades the coupon through `upgrade_coupon`, which only ever raises the reward and refuses once the QR is opened or the coupon has expired. Upgrading keeps the coupon's dates: it doesn't restart the 24-hour wait or extend the 7 days.
 

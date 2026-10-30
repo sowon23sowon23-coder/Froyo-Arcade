@@ -189,8 +189,8 @@ export default function CrushGame() {
           game="crush"
           outcome={mission.outcome}
           progressNote={
-            PROMOTION.missions.crush && r.level.n < PROMOTION.missions.crush.level
-              ? `Keep going: clear Level ${PROMOTION.missions.crush.level} to earn the reward.`
+            PROMOTION.missions.crush && r.level.n < PROMOTION.missions.crush.tiers[0]!.level
+              ? `Keep going: clear Level ${PROMOTION.missions.crush.tiers[0]!.level} to earn the reward.`
               : undefined
           }
         />
@@ -207,11 +207,7 @@ export default function CrushGame() {
             You needed <b>{result.r.needed}</b>. Try a booster or one more run.
           </>
         }
-        actions={[
-          { label: 'Add 5 Moves', onClick: closeAnd(() => engineRef.current?.addMoves()) },
-          { label: 'Shuffle Board', onClick: closeAnd(() => void engineRef.current?.shuffleAfterFail()), variant: 'tonal' },
-          { label: 'Play Again', onClick: closeAnd(() => engineRef.current?.startLevel()), variant: 'secondary' },
-        ]}
+        actions={[{ label: 'Play Again', onClick: closeAnd(() => engineRef.current?.startLevel()) }]}
       />
     );
   }
