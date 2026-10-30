@@ -7,6 +7,7 @@ import { logEvent } from '@/rewards/server/events';
 import { createClaim } from '@/rewards/server/missions';
 import { rewardsConfigured } from '@/rewards/server/supabase';
 import type { MissionOutcome } from '@/rewards/types';
+import { answerFor } from './schedule';
 import { scoreGuess } from './scoring';
 import { MAX_ATTEMPTS, type GameStatus, type GuessResponse, type TodayResponse } from '../types';
 
@@ -16,9 +17,6 @@ import { MAX_ATTEMPTS, type GameStatus, type GuessResponse, type TodayResponse }
 // Public-domain (Unlicense) Wordle valid-guess list, ~14.8k five-letter words.
 // Source: github.com/tabatkins/wordle-list.
 const ALLOWED_GUESSES: ReadonlySet<string> = new Set(words as string[]);
-
-// The original game had no word schedule yet and used one fixed answer every day.
-const ANSWER = 'MANGO';
 
 // Which calendar day "today" is, for a store chain operating on US time.
 const GAME_TIMEZONE = process.env.GAME_TIMEZONE || 'America/Los_Angeles';
@@ -74,7 +72,7 @@ async function writeState(state: SavedState): Promise<void> {
 
 function statusOf(state: SavedState): GameStatus {
   if (state.g.length === 0) return 'not_started';
-  if (state.g[state.g.length - 1] === ANSWER) return 'won';
+  if (state.g[state.g.length - 1] === answerFor(state.d)) return 'won';
   return state.g.length >= MAX_ATTEMPTS ? 'lost' : 'in_progress';
 }
 
@@ -92,13 +90,14 @@ export async function getToday(): Promise<TodayResponse> {
   const state = await readState(playDate);
   const status = statusOf(state);
   const finished = status === 'won' || status === 'lost';
+  const answer = answerFor(playDate);
   return {
     playDate,
     status,
     attempts: state.g.length,
     maxAttempts: MAX_ATTEMPTS,
-    guesses: state.g.map((guess) => ({ guess, marks: scoreGuess(guess, ANSWER) })),
-    answer: finished ? ANSWER : null,
+    guesses: state.g.map((guess) => ({ guess, marks: scoreGuess(guess, answer) })),
+    answer: finished ? answer : null,
     stats: { plays: state.p, wins: state.w, streak: state.s },
     mission: missionOf(state, status),
   };
@@ -110,9 +109,10 @@ export async function submitGuess(raw: unknown): Promise<GuessResponse> {
   if (!/^[A-Z]{5}$/.test(guess)) return { ok: false, reason: 'invalid_characters' };
 
   const state = await readState(getPlayDate());
+  const answer = answerFor(state.d);
   const before = statusOf(state);
   if (before === 'won' || before === 'lost') return { ok: false, reason: 'already_finished' };
-  if (guess !== ANSWER && !ALLOWED_GUESSES.has(guess)) return { ok: false, reason: 'not_in_wordlist' };
+  if (guess !== answer && !ALLOWED_GUESSES.has(guess)) return { ok: false, reason: 'not_in_wordlist' };
 
   state.g.push(guess);
   const status = statusOf(state);
@@ -137,10 +137,10 @@ export async function submitGuess(raw: unknown): Promise<GuessResponse> {
 
   return {
     ok: true,
-    marks: scoreGuess(guess, ANSWER),
+    marks: scoreGuess(guess, answer),
     attempt: state.g.length,
     status,
-    answer: finished ? ANSWER : null,
+    answer: finished ? answer : null,
     stats: { plays: state.p, wins: state.w, streak: state.s },
     mission: missionOf(state, status),
   };

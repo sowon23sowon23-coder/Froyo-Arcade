@@ -40,6 +40,7 @@ Copy `.env.example` to `.env.local`. Every variable is optional: with none set, 
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Rewards: sign-in from the browser |
 | `SUPABASE_SERVICE_ROLE_KEY`     | Rewards: server-only database access. Never expose it |
 | `STORE_QR_VALUE`                | The shared in-store QR payload. Until it's set, **Use in store** stays disabled |
+| `WORDLE_SECRET`                 | Long random text that keeps future Wordle answers secret. Set it in production; changing it changes the answers, including today's |
 | `GAME_TIMEZONE`                 | When the Wordle day rolls over (default `America/Los_Angeles`) |
 
 ## Project layout
@@ -166,7 +167,7 @@ The state is never stored. It is derived from `issued_at`, `expires_at`, and `qr
 
 ### Mission checks
 
-- **Wordle** is scored on the server, so a win is trusted.
+- **Wordle** is scored on the server, so a win can't be faked by sending a result. Progress lives in a cookie, though: after losing, a player who clears cookies or opens a private window sees a fresh board and can enter the word they were just shown. The one-coupon-per-account limit still applies.
 - **Catch, Crush, and Slice** run in the browser. `/api/play/finish` rejects results that real play can't produce: too fast for the time played (`src/rewards/server/missions.ts`). Someone scripting the API can still fake a result. Size the reward with that in mind.
 
 ### Setup (once per environment)
@@ -200,7 +201,8 @@ This shows which games lead to in-store **use attempts**. Discounts actually app
 
 ## Known limitations
 
-- Wordle still uses the original's single fixed answer, because the source game had no word schedule yet. To rotate answers, set `ANSWER` in `src/games/wordle/server/game.ts` from a schedule. **With rewards on, this makes the Wordle mission trivial for anyone who knows the word.** Rotate the answer or disable the Wordle mission (`missions.wordle: null`) before launch.
+- Wordle answers come from `src/games/wordle/server/answers.ts`. `schedule.ts` picks each day's word from the date and `WORDLE_SECRET`, with no repeats until the whole list has been used. Editing the list or the secret reshuffles the schedule, including today's word, so a game in progress may change.
+- Every player gets the same Wordle word each day, so it can be shared once someone has solved it.
 - A mission claim belongs to the browser that played it. Signing in on a different browser, for example after switching out of Instagram, can't use it. The claim page doesn't offer the switch.
 - There is no rate limiting on `/api/play/*` or `/api/events` beyond Supabase's own limits.
 - Wordle is one word per day. **Play Again** stays disabled until the next word unlocks, and the result card shows a countdown to it.
