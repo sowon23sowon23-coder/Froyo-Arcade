@@ -17,7 +17,8 @@ export type CouponRow = {
   qr_executed_at: string | null;
 };
 
-const COLUMNS = 'id, code, reward_title, reward_percent, source_game, issued_at, valid_from, expires_at, qr_executed_at';
+export const COUPON_COLUMNS = 'id, code, reward_title, reward_percent, source_game, issued_at, valid_from, expires_at, qr_executed_at';
+const COLUMNS = COUPON_COLUMNS;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 /** A mission has to be exchanged for a coupon within a day. */

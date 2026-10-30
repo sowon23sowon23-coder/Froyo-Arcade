@@ -636,6 +636,99 @@
   color: var(--text-2);
 }
 
+/* ---------- admin ---------- */
+
+.ad-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ad-bar > div {
+  display: flex;
+  gap: 6px;
+}
+
+.ad-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ad-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.ad-tile b {
+  color: var(--text);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ad-table {
+  overflow-x: auto;
+}
+
+.ad-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.ad-table th,
+.ad-table td {
+  padding: 10px 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ad-table th:first-child {
+  text-align: left;
+}
+
+.ad-table thead th {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.ad-table tbody tr {
+  border-top: 1px solid var(--border);
+}
+
+.ad-note {
+  margin-top: 8px;
+}
+
+.ad-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ad-search input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
 /* ---------- mockup page ---------- */
 
 .rw-mock-banner {

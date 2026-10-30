@@ -183,6 +183,14 @@ The state is never stored. It is derived from `valid_from`, `expires_at`, and `q
 4. **Authentication → URL Configuration**: set the Site URL and add `https://<your-domain>/auth/callback` to the Redirect URLs.
 5. Set the environment variables (see `.env.example`) in Vercel and redeploy.
 
+### Admin
+
+`/admin` is a read-only dashboard: coupon counts by state and discount, per-game funnel numbers, and coupon search by email or code. Its text is in Korean because it is an internal screen.
+
+- **Access:** one shared password in `ADMIN_PASSWORD`. Without it the admin stays closed. Ten wrong passwords in 15 minutes, from anyone, close sign-in for the rest of that window.
+- **Privacy:** it shows customer emails. It never shows QR values, and nothing on it can change a coupon.
+- **Numbers:** QR executions are use attempts, not confirmed discounts, and test records count until they are cleared.
+
 ### Mockup
 
 `/rewards/preview` shows every coupon screen with made-up data, including the staff steps and the QR countdown. It never calls the server, and its QR holds a value no POS accepts. It isn't linked from the site, and it returns 404 once `draft` is `false`.
