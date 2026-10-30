@@ -27,11 +27,19 @@ export function RewardsButton() {
   if (me && !me.configured) return null;
   const ready = me?.coupon?.status === 'available' || me?.coupon?.status === 'showing';
   return (
-    <Link className="btn btn-sm btn-secondary rw-header-btn" href="/rewards">
-      <GiftIcon />
-      My Rewards
-      {ready && <span className="rw-dot" aria-label="Reward ready" />}
-    </Link>
+    <div className="rw-header-account">
+      <Link className="btn btn-sm btn-secondary rw-header-btn" href="/rewards">
+        <GiftIcon />
+        My Rewards
+        {ready && <span className="rw-dot" aria-label="Reward ready" />}
+      </Link>
+      {me?.signedIn && (
+        <div className="rw-signed-in" title={me.email ?? undefined}>
+          <span className="rw-signed-in-dot" aria-hidden="true" />
+          <span className="rw-signed-in-text">Signed in{me.email ? ` as ${me.email}` : ''}</span>
+        </div>
+      )}
+    </div>
   );
 }
 

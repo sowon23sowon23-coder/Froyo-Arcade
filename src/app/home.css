@@ -12,13 +12,14 @@
 
 .home-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 18px;
 }
 
 .home-logo {
+  flex: none;
   width: 112px;
   height: auto;
 }

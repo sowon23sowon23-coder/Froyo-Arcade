@@ -60,8 +60,42 @@
 
 /* ---------- home ---------- */
 
+.rw-header-account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rw-signed-in {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: min(100%, 240px);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.rw-signed-in-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green-strong);
+}
+
+.rw-signed-in-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rw-header-btn {
   position: relative;
+  flex: none;
   gap: 6px;
 }
 
