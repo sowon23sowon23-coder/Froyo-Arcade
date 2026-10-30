@@ -58,8 +58,11 @@ export function QrOverlay({
   rewardTitle,
   showUntilMs,
   offsetMs,
+  mockup = false,
   onEnd,
 }: {
+  /** Marks the screen as a sample, for the mockup page. */
+  mockup?: boolean;
   value: string;
   code: string;
   rewardTitle: string;
@@ -104,6 +107,7 @@ export function QrOverlay({
   return (
     <div className="rw-qr-overlay" role="dialog" aria-modal="true" aria-labelledby="rw-qr-title">
       <div className="rw-qr-card">
+        {mockup && <p className="rw-mock-banner">Mockup: this QR won&apos;t work in store.</p>}
         <h2 id="rw-qr-title">Staff: scan this QR</h2>
         <p className="rw-qr-reward">{rewardTitle}</p>
         <div className="rw-qr-frame">

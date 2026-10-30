@@ -183,6 +183,10 @@ The state is never stored. It is derived from `valid_from`, `expires_at`, and `q
 4. **Authentication → URL Configuration**: set the Site URL and add `https://<your-domain>/auth/callback` to the Redirect URLs.
 5. Set the environment variables (see `.env.example`) in Vercel and redeploy.
 
+### Mockup
+
+`/rewards/preview` shows every coupon screen with made-up data, including the staff steps and the QR countdown. It never calls the server, and its QR holds a value no POS accepts. It isn't linked from the site, and it returns 404 once `draft` is `false`.
+
 ### Promotion settings
 
 Edit `src/rewards/config.ts`:
