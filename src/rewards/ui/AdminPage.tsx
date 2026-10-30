@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { GameShell } from '@/components/arcade/GameShell';
 import { getGame, type GameSlug } from '@/games/registry';
 import type { AdminCoupon } from '../server/admin';
-import type { AdminOverview, PlayerRow } from '../server/adminStats';
-import { formatDateTime } from '../format';
+import type { AdminOverview, DateRange, PlayerRow } from '../server/adminStats';
+import { formatDateTime, storeDay } from '../format';
 import type { CouponStatus } from '../types';
 import './rewards.css';
 
@@ -106,6 +106,54 @@ function Login({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** Picks the period every section below it counts. Null means everything. */
+function RangePicker({ range, busy, onChange }: { range: DateRange | null; busy: boolean; onChange: (range: DateRange | null) => void }) {
+  const [draft, setDraft] = useState<{ from: string; to: string }>({ from: range?.from ?? '', to: range?.to ?? '' });
+
+  useEffect(() => setDraft({ from: range?.from ?? '', to: range?.to ?? '' }), [range]);
+
+  const today = storeDay();
+  const presets: { label: string; range: DateRange | null }[] = [
+    { label: '오늘', range: { from: today, to: today } },
+    { label: '최근 7일', range: { from: storeDay(6), to: today } },
+    { label: '최근 30일', range: { from: storeDay(29), to: today } },
+    { label: '전체', range: null },
+  ];
+  const isActive = (preset: DateRange | null) => (preset === null ? range === null : range?.from === preset.from && range?.to === preset.to);
+
+  const set = (key: 'from' | 'to', value: string) => {
+    const next = { ...draft, [key]: value };
+    setDraft(next);
+    if (next.from && next.to) onChange(next.from <= next.to ? next : { from: next.to, to: next.from });
+  };
+
+  return (
+    <div className="ad-range card" role="group" aria-label="기간 선택">
+      <div className="ad-range-presets">
+        {presets.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            className={`btn btn-sm ${isActive(preset.range) ? 'btn-primary' : 'btn-secondary'}`}
+            aria-pressed={isActive(preset.range)}
+            onClick={() => onChange(preset.range)}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="ad-range-dates">
+        <input type="date" aria-label="시작 날짜" max={today} value={draft.from} onChange={(e) => set('from', e.target.value)} />
+        <span aria-hidden="true">~</span>
+        <input type="date" aria-label="끝 날짜" max={today} value={draft.to} onChange={(e) => set('to', e.target.value)} />
+      </div>
+      <span className="rw-fine" role="status">
+        {busy ? '불러오는 중…' : '매장 시간대(PT) 기준'}
+      </span>
+    </div>
+  );
+}
+
 function Kpi({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="ad-tile card">
@@ -148,10 +196,17 @@ function Table({ head, children }: { head: string[]; children: ReactNode }) {
 function Totals({ data }: { data: AdminOverview }) {
   const t = data.totals;
   return (
-    <Section title="전체 요약" note="플레이어는 브라우저 기준이라, 한 사람이 기기를 바꾸거나 쿠키를 지우면 여러 명으로 세어져요. 숫자에는 테스트 기록도 포함돼요.">
+    <Section
+      title={data.range ? '기간 요약' : '전체 요약'}
+      note={`플레이어는 브라우저 기준이라, 한 사람이 기기를 바꾸거나 쿠키를 지우면 여러 명으로 세어져요. 숫자에는 테스트 기록도 포함돼요.${data.range ? ' 기간 내 로그인은 계정의 마지막 로그인만 기록돼서, 그 뒤에 다시 로그인한 사람은 빠져요.' : ''}`}
+    >
       <div className="ad-tiles">
         <Kpi label="플레이어" value={whole(t.players)} note={`총 ${whole(t.plays)}판 시작`} />
-        <Kpi label="로그인 계정" value={whole(t.accounts)} note={`최근 7일 로그인 ${whole(t.activeAccounts7d)}명`} />
+        <Kpi
+          label="로그인 계정 (전체)"
+          value={whole(t.accounts)}
+          note={data.range ? `기간 내 신규 ${whole(t.newAccounts)}명 · 로그인 ${whole(t.recentSignIns)}명` : `최근 7일 로그인 ${whole(t.recentSignIns)}명`}
+        />
         <Kpi label="총 플레이 시간" value={duration(t.playMs)} note="끝까지 마친 판 기준" />
         <Kpi label="미션 달성 플레이어" value={whole(t.playersWithMission)} note={`플레이어의 ${pct(t.playersWithMission, t.players)}`} />
         <Kpi label="발급 쿠폰" value={whole(t.coupons)} note={`플레이어 대비 ${pct(t.coupons, t.players)}`} />
@@ -166,7 +221,10 @@ function Totals({ data }: { data: AdminOverview }) {
 function Coupons({ data }: { data: AdminOverview }) {
   return (
     <div className="ad-columns">
-      <Section title="쿠폰 상태" note="QR 실행은 사용 시도예요. POS에서 결과를 받지 않아 실제 할인 적용 수는 알 수 없어요.">
+      <Section
+        title="쿠폰 상태"
+        note={`QR 실행은 사용 시도예요. POS에서 결과를 받지 않아 실제 할인 적용 수는 알 수 없어요.${data.range ? ' 기간을 고르면 그 기간에 발급된 쿠폰의 현재 상태를 보여 줘요.' : ''}`}
+      >
         <Table head={['상태', '쿠폰 수', '비율']}>
           {STATUS_ORDER.map((status) => (
             <tr key={status}>
@@ -332,9 +390,47 @@ function Scores({ data }: { data: AdminOverview }) {
   );
 }
 
+/** Stays hidden until asked for, so it isn't on screen for anyone walking past. */
+function WordleAnswers() {
+  const [answers, setAnswers] = useState<{ date: string; answer: string }[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const reveal = async () => {
+    const { data } = await getJson<{ answers: { date: string; answer: string }[] }>('/api/admin/wordle');
+    setFailed(!data);
+    if (data) setAnswers(data.answers);
+  };
+
+  return (
+    <Section title="Wordle 정답" note="정답을 아는 사람은 바로 미션을 달성할 수 있으니 외부에 공유하지 마세요. Vercel의 WORDLE_SECRET을 바꾸면 정답도 바뀌어요.">
+      {answers ? (
+        <div className="ad-answers">
+          {answers.map((row, i) => (
+            <div key={row.date} className={`ad-tile card${i === 0 ? ' is-today' : ''}`}>
+              <span>{i === 0 ? `오늘 ${row.date}` : row.date}</span>
+              <b>{row.answer}</b>
+            </div>
+          ))}
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => setAnswers(null)}>
+            숨기기
+          </button>
+        </div>
+      ) : (
+        <button type="button" className="btn btn-sm btn-secondary" onClick={() => void reveal()}>
+          정답 보기
+        </button>
+      )}
+      {failed && <p className="rw-error">불러오지 못했어요. 다시 시도해 주세요.</p>}
+    </Section>
+  );
+}
+
 function Daily({ data }: { data: AdminOverview }) {
   return (
-    <Section title="최근 14일" note="매장 시간대(PT) 기준이에요.">
+    <Section
+      title={data.range ? '날짜별 현황' : '최근 14일'}
+      note={data.dailyTrimmed ? '기간이 길어서 가장 최근 92일만 보여 줘요. 위쪽 합계에는 기간 전체가 들어가요.' : undefined}
+    >
       <Table head={['날짜', '시작한 판', '플레이어', '새 계정', '쿠폰 발급', 'QR 실행']}>
         {data.daily.map((d) => (
           <tr key={d.date}>
@@ -411,7 +507,7 @@ function CouponSearch() {
   }, [run]);
 
   return (
-    <Section title="쿠폰 찾기">
+    <Section title="쿠폰 찾기" note="기간과 상관없이 모든 쿠폰에서 찾아요. 검색하지 않으면 최근 발급된 20개를 보여 줘요.">
       <form
         className="ad-search"
         onSubmit={(e) => {
@@ -449,9 +545,18 @@ function CouponSearch() {
 export function AdminPage() {
   const [state, setState] = useState<'loading' | 'login' | 'error' | 'ready'>('loading');
   const [data, setData] = useState<AdminOverview | null>(null);
+  const [range, setRange] = useState<DateRange | null>(null);
+  const [busy, setBusy] = useState(false);
+  const latest = useRef(0);
 
-  const load = useCallback(async () => {
-    const res = await getJson<AdminOverview>('/api/admin/overview');
+  const load = useCallback(async (period: DateRange | null) => {
+    // Quick clicks can answer out of order; only the newest request counts.
+    const request = ++latest.current;
+    setBusy(true);
+    const query = period ? `?from=${period.from}&to=${period.to}` : '';
+    const res = await getJson<AdminOverview>(`/api/admin/overview${query}`);
+    if (request !== latest.current) return;
+    setBusy(false);
     if (res.data) {
       setData(res.data);
       setState('ready');
@@ -461,8 +566,13 @@ export function AdminPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    void load(null);
   }, [load]);
+
+  const choose = (next: DateRange | null) => {
+    setRange(next);
+    void load(next);
+  };
 
   const logout = async () => {
     await fetch('/api/admin/login', { method: 'DELETE' }).catch(() => undefined);
@@ -474,11 +584,11 @@ export function AdminPage() {
     <GameShell title="어드민" className="admin">
       <div className="ad-page screen-in">
         {state === 'loading' && <p className="rw-muted">불러오는 중…</p>}
-        {state === 'login' && <Login onDone={() => void load()} />}
+        {state === 'login' && <Login onDone={() => void load(range)} />}
         {state === 'error' && (
           <div className="card rw-empty">
             불러오지 못했어요.
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => void load()}>
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => void load(range)}>
               다시 시도
             </button>
           </div>
@@ -488,7 +598,7 @@ export function AdminPage() {
             <div className="ad-bar">
               <span className="rw-fine">기준 시각 {formatDateTime(data.generatedAt)}</span>
               <div>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={() => void load()}>
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => void load(range)}>
                   새로고침
                 </button>
                 <button type="button" className="btn btn-sm btn-ghost" onClick={() => void logout()}>
@@ -496,10 +606,12 @@ export function AdminPage() {
                 </button>
               </div>
             </div>
+            <RangePicker range={range} busy={busy} onChange={choose} />
             <Totals data={data} />
             <Coupons data={data} />
             <Games data={data} />
             <Scores data={data} />
+            <WordleAnswers />
             <Daily data={data} />
             <Players data={data} />
             <CouponSearch />

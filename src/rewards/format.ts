@@ -22,6 +22,13 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+/** A calendar day in the stores' time zone, as YYYY-MM-DD, some days before now. */
+export function storeDay(daysAgo = 0): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: PROMOTION.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    Date.now() - daysAgo * 24 * 60 * 60 * 1000
+  );
+}
+
 export function gameTitle(slug: GameSlug): string {
   return getGame(slug).title;
 }

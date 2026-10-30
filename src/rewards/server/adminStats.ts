@@ -70,7 +70,9 @@ export type AdminOverview = {
   totals: {
     players: number;
     accounts: number;
-    activeAccounts7d: number;
+    /** Accounts whose latest sign-in falls in the period (the last 7 days with no period). */
+    recentSignIns: number;
+    newAccounts: number;
     playersWithMission: number;
     coupons: number;
     qrExecuted: number;
@@ -87,12 +89,19 @@ export type AdminOverview = {
   wordle: WordleRow;
   daily: DailyRow[];
   players: PlayerRow[];
+  range: DateRange | null;
+  /** True when the period had more days than the daily table shows. */
+  dailyTrimmed: boolean;
   generatedAt: string;
 };
+
+/** Both days included, as YYYY-MM-DD in the stores' time zone. */
+export type DateRange = { from: string; to: string };
 
 const GAMES: GameSlug[] = ['catch', 'crush', 'wordle', 'slice'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_DAYS = 14;
+const MAX_DAILY_DAYS = 92;
 
 const num = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
@@ -111,8 +120,21 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
+const DAY_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: PROMOTION.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** The calendar day in the stores' time zone, as YYYY-MM-DD. */
 function dayKey(ms: number): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: PROMOTION.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+  return DAY_FORMAT.format(ms);
+}
+
+/** Every day from one YYYY-MM-DD to another, newest first, at most `limit` of them. */
+function daysBetween(from: string, to: string, limit: number): string[] {
+  const days: string[] = [];
+  const first = Date.parse(`${from}T00:00:00Z`);
+  for (let at = Date.parse(`${to}T00:00:00Z`); at >= first && days.length < limit; at -= DAY_MS) {
+    days.push(new Date(at).toISOString().slice(0, 10));
+  }
+  return days;
 }
 
 /**
@@ -143,8 +165,18 @@ export function buildOverview(input: {
   claims: StatClaim[];
   coupons: StatCoupon[];
   nowMs: number;
+  range?: DateRange | null;
 }): AdminOverview {
-  const { events, users, claims, coupons, nowMs } = input;
+  const { events: allEvents, users, claims, coupons: allCoupons, nowMs } = input;
+  const range = input.range ?? null;
+  const inRange = (iso: string) => {
+    if (!range) return true;
+    const day = dayKey(Date.parse(iso));
+    return day >= range.from && day <= range.to;
+  };
+  const events = allEvents.filter((e) => inRange(e.created_at));
+  // A coupon belongs to the day it was issued, so its QR rate can't pass 100%.
+  const coupons = allCoupons.filter((c) => inRange(c.issuedAt));
   const ofType = (type: string) => events.filter((e) => e.type === type);
   const starts = ofType('game_start');
   const allCompletes = ofType('game_complete');
@@ -228,8 +260,11 @@ export function buildOverview(input: {
     attempts: [1, 2, 3, 4, 5, 6].map((n) => winAttempts.filter((a) => a === n).length),
   };
 
-  const dates = Array.from({ length: DAILY_DAYS }, (_, i) => dayKey(nowMs - i * DAY_MS));
-  const onDay = (list: StatEvent[], date: string) => list.filter((e) => dayKey(Date.parse(e.created_at)) === date);
+  const dates = range
+    ? daysBetween(range.from, range.to, MAX_DAILY_DAYS)
+    : Array.from({ length: DAILY_DAYS }, (_, i) => dayKey(nowMs - i * DAY_MS));
+  const dailyTrimmed = range !== null && daysBetween(range.from, range.to, MAX_DAILY_DAYS + 1).length > MAX_DAILY_DAYS;
+  const onDay =(list: StatEvent[], date: string) => list.filter((e) => dayKey(Date.parse(e.created_at)) === date);
   const daily: DailyRow[] = dates.map((date) => ({
     date,
     plays: onDay(starts, date).length,
@@ -247,8 +282,10 @@ export function buildOverview(input: {
     if (!anonsByUser.has(userId)) anonsByUser.set(userId, new Set());
     anonsByUser.get(userId)!.add(anon);
   };
+  // Uses every event, not just the period's: a browser linked last week still
+  // belongs to that account today.
   for (const claim of claims) link(claim.user_id, claim.anon_id);
-  for (const event of events) link(event.user_id, event.anon_id);
+  for (const event of allEvents) link(event.user_id, event.anon_id);
 
   const players: PlayerRow[] = users
     .map((user) => {
@@ -262,7 +299,7 @@ export function buildOverview(input: {
         });
         return values.length ? [{ game, value: Math.max(...values) }] : [];
       });
-      const coupon = coupons.find((c) => c.userId === user.id) ?? null;
+      const coupon = allCoupons.find((c) => c.userId === user.id) ?? null;
       return {
         userId: user.id,
         email: user.email,
@@ -279,6 +316,12 @@ export function buildOverview(input: {
         qrExecutedAt: coupon?.qrExecutedAt ?? null,
       };
     })
+    // With a period, only people who did something in it.
+    .filter((p) => {
+      if (!range) return true;
+      const issuedHere = coupons.some((c) => c.userId === p.userId);
+      return p.plays > 0 || p.completes > 0 || p.missions > 0 || issuedHere || inRange(p.joinedAt) || (p.lastSignInAt !== null && inRange(p.lastSignInAt));
+    })
     .sort((a, b) => Date.parse(b.lastSignInAt ?? b.joinedAt) - Date.parse(a.lastSignInAt ?? a.joinedAt));
 
   const byStatus: Record<CouponStatus, number> = { waiting: 0, available: 0, showing: 0, shown: 0, expired: 0 };
@@ -292,7 +335,8 @@ export function buildOverview(input: {
     totals: {
       players: playerIds.size,
       accounts: users.length,
-      activeAccounts7d: users.filter((u) => u.last_sign_in_at && nowMs - Date.parse(u.last_sign_in_at) <= 7 * DAY_MS).length,
+      recentSignIns: users.filter((u) => u.last_sign_in_at && (range ? inRange(u.last_sign_in_at) : nowMs - Date.parse(u.last_sign_in_at) <= 7 * DAY_MS)).length,
+      newAccounts: users.filter((u) => inRange(u.created_at)).length,
       playersWithMission: playersWithMission.size,
       coupons: coupons.length,
       qrExecuted: coupons.filter((c) => c.qrExecutedAt).length,
@@ -309,6 +353,8 @@ export function buildOverview(input: {
     wordle,
     daily,
     players,
+    range,
+    dailyTrimmed,
     generatedAt: new Date(nowMs).toISOString(),
   };
 }

@@ -2,7 +2,7 @@ import 'server-only';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { CouponView } from '../types';
-import { buildOverview, type AdminOverview, type StatClaim, type StatEvent, type StatUser } from './adminStats';
+import { buildOverview, type AdminOverview, type DateRange, type StatClaim, type StatEvent, type StatUser } from './adminStats';
 import { COUPON_COLUMNS, toView, type CouponRow } from './coupons';
 import { admin, rewardsConfigured } from './supabase';
 
@@ -117,7 +117,7 @@ async function allUsers(): Promise<StatUser[]> {
 /** Funnel events only: screen views and failed admin sign-ins aren't part of these numbers. */
 const STAT_EVENTS = ['game_start', 'game_complete', 'mission_achieved', 'coupon_issued', 'coupon_upgraded', 'qr_execute', 'store_click'];
 
-export async function overview(): Promise<AdminOverview> {
+export async function overview(range: DateRange | null): Promise<AdminOverview> {
   const now = Date.now();
   const [events, users, claims, coupons] = await Promise.all([
     allRows<StatEvent>('events', 'type, game, anon_id, user_id, meta, created_at', 'id'),
@@ -132,6 +132,7 @@ export async function overview(): Promise<AdminOverview> {
     claims,
     coupons: coupons.map((row) => ({ ...toView(row, now), userId: row.user_id })),
     nowMs: now,
+    range,
   });
 }
 

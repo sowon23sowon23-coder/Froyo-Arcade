@@ -31,6 +31,15 @@ function shuffled(cycle: number): string[] {
 
 let cached: { cycle: number; words: string[] } | null = null;
 
+/** A run of days starting at a play date, for the admin. */
+export function answersFrom(playDate: string, days: number): { date: string; answer: string }[] {
+  const start = Date.parse(`${playDate}T00:00:00Z`);
+  return Array.from({ length: days }, (_, i) => {
+    const date = new Date(start + i * DAY_MS).toISOString().slice(0, 10);
+    return { date, answer: answerFor(date) };
+  });
+}
+
 export function answerFor(playDate: string): string {
   const day = dayNumber(playDate);
   const cycle = Math.floor(day / ANSWERS.length);
