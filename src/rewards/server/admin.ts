@@ -1,7 +1,8 @@
 import 'server-only';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
-import type { CouponStatus, CouponView } from '../types';
+import type { CouponView } from '../types';
+import { buildOverview, type AdminOverview, type StatClaim, type StatEvent, type StatUser } from './adminStats';
 import { COUPON_COLUMNS, toView, type CouponRow } from './coupons';
 import { admin, rewardsConfigured } from './supabase';
 
@@ -80,77 +81,62 @@ export async function signOut(): Promise<void> {
   (await cookies()).delete(COOKIE);
 }
 
-/** Every matching row: PostgREST returns at most 1000 at a time. */
-async function allCoupons(): Promise<CouponRow[]> {
-  const rows: CouponRow[] = [];
+/** Every row of a table: PostgREST returns at most 1000 at a time. */
+async function allRows<T>(table: string, columns: string, orderBy: string): Promise<T[]> {
+  const rows: T[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await admin()
-      .from('coupons')
-      .select(COUPON_COLUMNS)
-      .order('issued_at', { ascending: false })
+      .from(table)
+      .select(columns)
+      .order(orderBy, { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw error;
-    rows.push(...(data as CouponRow[]));
+    rows.push(...((data ?? []) as T[]));
     if (!data || data.length < PAGE) return rows;
   }
 }
 
-export type FunnelRow = {
-  game: string;
-  game_starts: number;
-  game_completes: number;
-  missions_achieved: number;
-  coupons_issued: number;
-  store_clicks: number;
-  qr_executions: number;
-};
-
-export type AdminOverview = {
-  funnel: FunnelRow[];
-  couponTotal: number;
-  byStatus: Record<CouponStatus, number>;
-  byPercent: { percentOff: number; count: number }[];
-  upgrades: number;
-  generatedAt: string;
-};
-
-export async function overview(): Promise<AdminOverview> {
-  const db = admin();
-  const now = Date.now();
-  const [funnel, coupons, upgrades] = await Promise.all([
-    db.from('reward_funnel_by_game').select('*').not('game', 'is', null).order('game'),
-    allCoupons(),
-    db.from('events').select('id', { count: 'exact', head: true }).eq('type', 'coupon_upgraded'),
-  ]);
-  if (funnel.error) throw funnel.error;
-  if (upgrades.error) throw upgrades.error;
-
-  const byStatus: Record<CouponStatus, number> = { waiting: 0, available: 0, showing: 0, shown: 0, expired: 0 };
-  const percents = new Map<number, number>();
-  for (const row of coupons) {
-    const view = toView(row, now);
-    byStatus[view.status] += 1;
-    percents.set(view.percentOff, (percents.get(view.percentOff) ?? 0) + 1);
-  }
-
-  return {
-    funnel: (funnel.data ?? []) as FunnelRow[],
-    couponTotal: coupons.length,
-    byStatus,
-    byPercent: [...percents].map(([percentOff, count]) => ({ percentOff, count })).sort((a, b) => a.percentOff - b.percentOff),
-    upgrades: upgrades.count ?? 0,
-    generatedAt: new Date(now).toISOString(),
-  };
-}
-
-async function emailsById(): Promise<Map<string, string>> {
-  const emails = new Map<string, string>();
+async function allUsers(): Promise<StatUser[]> {
+  const users: StatUser[] = [];
   for (let page = 1; ; page += 1) {
     const { data, error } = await admin().auth.admin.listUsers({ page, perPage: PAGE });
     if (error) throw error;
-    for (const user of data.users) emails.set(user.id, user.email ?? '');
-    if (data.users.length < PAGE) return emails;
+    for (const user of data.users) {
+      users.push({
+        id: user.id,
+        email: user.email ?? '',
+        provider: String(user.app_metadata?.provider ?? 'email'),
+        created_at: user.created_at,
+        last_sign_in_at: user.last_sign_in_at ?? null,
+      });
+    }
+    if (data.users.length < PAGE) return users;
   }
+}
+
+/** Funnel events only: screen views and failed admin sign-ins aren't part of these numbers. */
+const STAT_EVENTS = ['game_start', 'game_complete', 'mission_achieved', 'coupon_issued', 'coupon_upgraded', 'qr_execute', 'store_click'];
+
+export async function overview(): Promise<AdminOverview> {
+  const now = Date.now();
+  const [events, users, claims, coupons] = await Promise.all([
+    allRows<StatEvent>('events', 'type, game, anon_id, user_id, meta, created_at', 'id'),
+    allUsers(),
+    allRows<StatClaim>('mission_claims', 'anon_id, user_id', 'achieved_at'),
+    allRows<CouponRow & { user_id: string }>('coupons', `${COUPON_COLUMNS}, user_id`, 'issued_at'),
+  ]);
+  return buildOverview({
+    // A browser's page views still tie it to an account, so they stay for linking only.
+    events: events.map((e) => (STAT_EVENTS.includes(e.type) ? e : { ...e, type: 'link_only' })),
+    users,
+    claims,
+    coupons: coupons.map((row) => ({ ...toView(row, now), userId: row.user_id })),
+    nowMs: now,
+  });
+}
+
+async function emailsById(): Promise<Map<string, string>> {
+  return new Map((await allUsers()).map((user) => [user.id, user.email]));
 }
 
 export type AdminCoupon = CouponView & { email: string };

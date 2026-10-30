@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     type: 'game_complete',
     game,
     anonId: anon,
-    meta: { ...verdict.summary, elapsedMs, plausible: verdict.plausible },
+    meta: { ...verdict.summary, elapsedMs, plausible: verdict.plausible, sessionId: session.id },
   });
 
   if (!verdict.achieved) return json<MissionOutcome>({ state: 'missed' });

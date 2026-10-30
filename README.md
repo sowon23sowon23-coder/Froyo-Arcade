@@ -185,11 +185,11 @@ The state is never stored. It is derived from `valid_from`, `expires_at`, and `q
 
 ### Admin
 
-`/admin` is a read-only dashboard: coupon counts by state and discount, per-game funnel numbers, and coupon search by email or code. Its text is in Korean because it is an internal screen.
+`/admin` is a read-only dashboard built for a desktop screen: totals, coupon counts by state and discount, per-game funnel and play time, score distributions with how many players reach each discount, the last 14 days, signed-in players, and coupon search by email or code. Its text is in Korean because it is an internal screen. The arithmetic is in `src/rewards/server/adminStats.ts`.
 
 - **Access:** one shared password in `ADMIN_PASSWORD`. Without it the admin stays closed. Ten wrong passwords in 15 minutes, from anyone, close sign-in for the rest of that window.
 - **Privacy:** it shows customer emails. It never shows QR values, and nothing on it can change a coupon.
-- **Numbers:** QR executions are use attempts, not confirmed discounts, and test records count until they are cleared.
+- **Numbers:** QR executions are use attempts, not confirmed discounts, and test records count until they are cleared. Play time covers finished rounds only, and Wordle records none. Players are counted by browser, and play from before sign-in joins an account only through that browser's claims or signed-in activity.
 
 ### Mockup
 

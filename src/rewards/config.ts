@@ -127,7 +127,7 @@ export type EarnedReward = {
 const percentTitle = (percentOff: number) => `${percentOff}% off 1 cup`;
 
 /** A game's discount steps on one number: score for Catch and Slice, level for Crush. */
-function steps(game: GameSlug): { at: number; percentOff: number }[] {
+export function rewardSteps(game: GameSlug): { at: number; percentOff: number }[] {
   const m = PROMOTION.missions;
   if (game === 'catch') return (m.catch?.tiers ?? []).map((t) => ({ at: t.score, percentOff: t.percentOff }));
   if (game === 'slice') return (m.slice?.tiers ?? []).map((t) => ({ at: t.score, percentOff: t.percentOff }));
@@ -137,7 +137,7 @@ function steps(game: GameSlug): { at: number; percentOff: number }[] {
 
 /** The discount steps a game shows, or an empty list if it pays one fixed reward. */
 export function tiersFor(game: GameSlug) {
-  return steps(game).map((s) => ({
+  return rewardSteps(game).map((s) => ({
     goal: game === 'crush' ? `Level ${s.at}` : `${s.at}+ points`,
     title: percentTitle(s.percentOff),
   }));
@@ -152,10 +152,10 @@ export function rewardFor(game: GameSlug, result: { score?: unknown; level?: unk
   const value = game === 'crush' ? result.level : result.score;
   if (typeof value !== 'number') return { title: PROMOTION.reward.title, percentOff: 0 };
 
-  const reached = steps(game)
+  const reached = rewardSteps(game)
     .filter((s) => value >= s.at)
     .at(-1);
-  const next = steps(game).find((s) => value < s.at);
+  const next = rewardSteps(game).find((s) => value < s.at);
   return {
     title: percentTitle(reached?.percentOff ?? 0),
     percentOff: reached?.percentOff ?? 0,
