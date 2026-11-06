@@ -690,6 +690,34 @@
   letter-spacing: 0.06em;
 }
 
+.ad-daily th,
+.ad-daily td {
+  padding: 7px 8px;
+  font-size: var(--fs-xs);
+}
+
+.ad-daily th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  padding-left: 14px;
+}
+
+.ad-daily td.is-zero {
+  color: var(--border-strong);
+}
+
+.ad-daily td:not(.is-zero) {
+  font-weight: 700;
+}
+
+.ad-daily .ad-daily-total {
+  border-left: 1px solid var(--border);
+  padding-right: 14px;
+  font-weight: 700;
+}
+
 .ad-login {
   width: 100%;
   max-width: 420px;

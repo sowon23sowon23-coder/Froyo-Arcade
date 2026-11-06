@@ -431,19 +431,62 @@ function Daily({ data }: { data: AdminOverview }) {
       title={data.range ? '날짜별 현황' : '최근 14일'}
       note={data.dailyTrimmed ? '기간이 길어서 가장 최근 92일만 보여 줘요. 위쪽 합계에는 기간 전체가 들어가요.' : undefined}
     >
-      <Table head={['날짜', '시작한 판', '플레이어', '새 계정', '쿠폰 발급', 'QR 실행']}>
-        {data.daily.map((d) => (
-          <tr key={d.date}>
-            <th scope="row">{d.date}</th>
-            <td>{whole(d.plays)}</td>
-            <td>{whole(d.players)}</td>
-            <td>{whole(d.newAccounts)}</td>
-            <td>{whole(d.coupons)}</td>
-            <td>{whole(d.qr)}</td>
-          </tr>
-        ))}
-      </Table>
+      <DailyGrid days={data.daily} />
     </Section>
+  );
+}
+
+const DAILY_ROWS: [keyof AdminOverview['daily'][number], string][] = [
+  ['plays', '시작한 판'],
+  ['players', '플레이어'],
+  ['newAccounts', '새 계정'],
+  ['coupons', '쿠폰 발급'],
+  ['qr', 'QR 실행'],
+];
+
+/** Days run left to right, oldest first, so a whole period fits in five short rows. */
+function DailyGrid({ days }: { days: AdminOverview['daily'] }) {
+  const ordered = [...days].reverse();
+  const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+  const box = useRef<HTMLDivElement>(null);
+  // Long periods scroll sideways: start at the newest day, on the right.
+  useEffect(() => {
+    if (box.current) box.current.scrollLeft = box.current.scrollWidth;
+  }, [days]);
+  return (
+    <div ref={box} className="ad-table ad-daily card">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">항목</th>
+            {ordered.map((d) => (
+              <th key={d.date} scope="col" title={d.date}>
+                {shortDate(d.date)}
+              </th>
+            ))}
+            <th scope="col" className="ad-daily-total">
+              합계
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {DAILY_ROWS.map(([key, label]) => {
+            const values = ordered.map((d) => Number(d[key]));
+            return (
+              <tr key={key}>
+                <th scope="row">{label}</th>
+                {values.map((value, i) => (
+                  <td key={ordered[i]!.date} className={value === 0 ? 'is-zero' : undefined}>
+                    {whole(value)}
+                  </td>
+                ))}
+                <td className="ad-daily-total">{key === 'players' ? '-' : whole(values.reduce((a, b) => a + b, 0))}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
