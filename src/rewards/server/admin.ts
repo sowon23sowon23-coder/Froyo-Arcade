@@ -116,7 +116,7 @@ async function allUsers(): Promise<StatUser[]> {
 }
 
 /** Funnel events only: screen views and failed admin sign-ins aren't part of these numbers. */
-const STAT_EVENTS = ['game_start', 'game_complete', 'mission_achieved', 'coupon_issued', 'coupon_upgraded', 'qr_execute', 'store_click'];
+const STAT_EVENTS = ['landing', 'game_start', 'game_complete', 'mission_achieved', 'coupon_issued', 'coupon_upgraded', 'qr_execute', 'store_click'];
 
 export async function overview(range: DateRange | null): Promise<AdminOverview> {
   const now = Date.now();

@@ -62,5 +62,5 @@ export type ExecuteResponse =
       serverNow?: string;
     };
 
-export const CLIENT_EVENTS = ['store_click', 'rewards_view', 'claim_view', 'sign_in_view', 'use_in_store_open'] as const;
+export const CLIENT_EVENTS = ['landing', 'store_click', 'rewards_view', 'claim_view', 'sign_in_view', 'use_in_store_open'] as const;
 export type ClientEvent = (typeof CLIENT_EVENTS)[number];

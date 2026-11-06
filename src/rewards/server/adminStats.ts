@@ -1,3 +1,4 @@
+import { NO_RECORD, channelKey, channelOf, type Channel } from '../attribution';
 import { PROMOTION, rewardSteps, tiersFor } from '../config';
 import type { GameSlug } from '@/games/registry';
 import type { CouponStatus, CouponView } from '../types';
@@ -48,7 +49,19 @@ export type ScoreRow = {
 };
 
 export type WordleRow = { rounds: number; wins: number; averageAttempts: number; attempts: number[] };
-export type DailyRow = { date: string; plays: number; players: number; newAccounts: number; coupons: number; qr: number };
+export type ChannelRow = Channel & {
+  /** True when the channel came from UTM tags. */
+  tagged: boolean;
+  visits: number;
+  visitors: number;
+  players: number;
+  plays: number;
+  missions: number;
+  coupons: number;
+  qr: number;
+};
+
+export type DailyRow ={ date: string; plays: number; players: number; newAccounts: number; coupons: number; qr: number };
 
 export type PlayerRow = {
   userId: string;
@@ -88,6 +101,7 @@ export type AdminOverview = {
   scores: ScoreRow[];
   wordle: WordleRow;
   daily: DailyRow[];
+  channels: ChannelRow[];
   players: PlayerRow[];
   range: DateRange | null;
   /** True when the period had more days than the daily table shows. */
@@ -157,6 +171,84 @@ function roundTimes(game: GameSlug, completes: StatEvent[]): number[] {
     const ms = num(e.meta?.elapsedMs);
     return ms === null ? [] : [ms];
   });
+}
+
+type Touch = { channel: Channel; tagged: boolean; at: string };
+
+/**
+ * Credits each browser to one channel, using every landing ever recorded: its
+ * first landing with UTM tags, or else its first landing. A coupon or QR is
+ * credited through the account to the browser that earned it, since the QR is
+ * often opened on another device at the store.
+ */
+function buildChannels(
+  allEvents: StatEvent[],
+  events: StatEvent[],
+  claims: StatClaim[],
+  anonsByUser: Map<string, Set<string>>
+): ChannelRow[] {
+  const touches = new Map<string, Touch>();
+  for (const e of [...allEvents].filter((x) => x.type === 'landing' && x.anon_id).sort((a, b) => a.created_at.localeCompare(b.created_at))) {
+    const tagged = e.meta?.tagged === true;
+    const current = touches.get(e.anon_id!);
+    if (!current || (tagged && !current.tagged)) touches.set(e.anon_id!, { channel: channelOf(e.meta), tagged, at: e.created_at });
+  }
+
+  const pick = (anons: Iterable<string>): Touch | null => {
+    let best: Touch | null = null;
+    for (const anon of anons) {
+      const touch = touches.get(anon);
+      if (!touch) continue;
+      if (!best || (touch.tagged && !best.tagged) || (touch.tagged === best.tagged && touch.at < best.at)) best = touch;
+    }
+    return best;
+  };
+  // An account's channel is that of the browsers it played and claimed in.
+  const claimAnons = new Map<string, Set<string>>();
+  for (const claim of claims) {
+    if (!claim.user_id) continue;
+    if (!claimAnons.has(claim.user_id)) claimAnons.set(claim.user_id, new Set());
+    claimAnons.get(claim.user_id)!.add(claim.anon_id);
+  }
+  const userTouch = (userId: string) => pick(claimAnons.get(userId) ?? []) ?? pick(anonsByUser.get(userId) ?? []);
+
+  const touchOf = (e: StatEvent): Touch | null => {
+    if (e.user_id && (e.type === 'coupon_issued' || e.type === 'qr_execute')) {
+      const viaUser = userTouch(e.user_id);
+      if (viaUser) return viaUser;
+    }
+    return e.anon_id ? (touches.get(e.anon_id) ?? null) : null;
+  };
+
+  type Acc = ChannelRow & { visitorSet: Set<string>; playerSet: Set<string> };
+  const rows = new Map<string, Acc>();
+  const row = (touch: Touch | null): Acc => {
+    const channel = touch?.channel ?? NO_RECORD;
+    const key = channelKey(channel);
+    if (!rows.has(key)) {
+      rows.set(key, { ...channel, tagged: touch?.tagged ?? false, visits: 0, visitors: 0, players: 0, plays: 0, missions: 0, coupons: 0, qr: 0, visitorSet: new Set(), playerSet: new Set() });
+    }
+    return rows.get(key)!;
+  };
+
+  for (const e of events) {
+    if (e.type === 'landing') {
+      // A visit counts toward the channel it arrived through.
+      const r = row({ channel: channelOf(e.meta), tagged: e.meta?.tagged === true, at: e.created_at });
+      r.visits += 1;
+      if (e.anon_id) r.visitorSet.add(e.anon_id);
+    } else if (e.type === 'game_start') {
+      const r = row(touchOf(e));
+      r.plays += 1;
+      if (e.anon_id) r.playerSet.add(e.anon_id);
+    } else if (e.type === 'mission_achieved') row(touchOf(e)).missions += 1;
+    else if (e.type === 'coupon_issued') row(touchOf(e)).coupons += 1;
+    else if (e.type === 'qr_execute') row(touchOf(e)).qr += 1;
+  }
+
+  return [...rows.values()]
+    .map(({ visitorSet, playerSet, ...r }) => ({ ...r, visitors: visitorSet.size, players: playerSet.size }))
+    .sort((a, b) => b.visits - a.visits || b.plays - a.plays || b.coupons - a.coupons);
 }
 
 export function buildOverview(input: {
@@ -324,6 +416,8 @@ export function buildOverview(input: {
     })
     .sort((a, b) => Date.parse(b.lastSignInAt ?? b.joinedAt) - Date.parse(a.lastSignInAt ?? a.joinedAt));
 
+  const channels = buildChannels(allEvents, events, claims, anonsByUser);
+
   const byStatus: Record<CouponStatus, number> = { waiting: 0, available: 0, showing: 0, shown: 0, expired: 0 };
   const percents = new Map<number, number>();
   for (const coupon of coupons) {
@@ -352,6 +446,7 @@ export function buildOverview(input: {
     scores,
     wordle,
     daily,
+    channels,
     players,
     range,
     dailyTrimmed,

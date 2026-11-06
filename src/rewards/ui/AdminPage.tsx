@@ -283,6 +283,30 @@ function exportScores(data: AdminOverview) {
   downloadCsv(csvName('scores', data.range), toCsv(['게임', '항목', '값', '비율(%)'], rows));
 }
 
+function exportChannels(data: AdminOverview) {
+  downloadCsv(
+    csvName('channels', data.range),
+    toCsv(
+      ['source', 'medium', 'campaign', 'UTM 여부', '방문', '방문자', '플레이어', '시작한 판', '미션 달성', '쿠폰 발급', 'QR 실행', '방문자→쿠폰(%)', '쿠폰→QR(%)'],
+      data.channels.map((c) => [
+        c.source,
+        c.medium,
+        c.campaign,
+        c.tagged ? 'UTM' : '추정',
+        c.visits,
+        c.visitors,
+        c.players,
+        c.plays,
+        c.missions,
+        c.coupons,
+        c.qr,
+        ratio(c.coupons, c.visitors),
+        ratio(c.qr, c.coupons),
+      ])
+    )
+  );
+}
+
 function exportDaily(data: AdminOverview) {
   downloadCsv(
     csvName('daily', data.range),
@@ -568,6 +592,111 @@ function WordleAnswers() {
   );
 }
 
+function Channels({ data }: { data: AdminOverview }) {
+  return (
+    <Section
+      action={<CsvButton onClick={() => exportChannels(data)} />}
+      title="유입 경로"
+      note="방문은 그 경로로 들어온 횟수예요. 플레이, 쿠폰, QR은 그 브라우저가 처음 UTM 링크로 들어온 경로로 집계해요. UTM이 없으면 인스타그램 같은 앱 안 브라우저나 이전 사이트로 추정해요(추정 표시). 유입 기록 없음은 이 기능을 넣기 전 기록이에요."
+    >
+      <Table head={['경로 (source / medium / campaign)', '방문', '방문자', '플레이어', '시작한 판', '미션 달성', '쿠폰 발급', 'QR 실행', '방문자→쿠폰', '쿠폰→QR']}>
+        {data.channels.map((c) => (
+          <tr key={`${c.source}|${c.medium}|${c.campaign}`}>
+            <th scope="row" className="ad-channel">
+              <b>{c.source}</b>
+              {c.medium && <span> / {c.medium}</span>}
+              {c.campaign && <span> / {c.campaign}</span>}
+              {!c.tagged && c.medium !== '' && <em>추정</em>}
+            </th>
+            <td>{whole(c.visits)}</td>
+            <td>{whole(c.visitors)}</td>
+            <td>{whole(c.players)}</td>
+            <td>{whole(c.plays)}</td>
+            <td>{whole(c.missions)}</td>
+            <td>{whole(c.coupons)}</td>
+            <td>{whole(c.qr)}</td>
+            <td>{pct(c.coupons, c.visitors)}</td>
+            <td>{pct(c.qr, c.coupons)}</td>
+          </tr>
+        ))}
+        {data.channels.length === 0 && (
+          <tr>
+            <td colSpan={10}>아직 기록이 없어요.</td>
+          </tr>
+        )}
+      </Table>
+    </Section>
+  );
+}
+
+const SITE = 'https://froyo-arcade.vercel.app';
+const LINK_PAGES = [
+  { path: '/', label: '홈' },
+  { path: '/catch', label: 'Froyo Catch' },
+  { path: '/crush', label: 'Froyo Crush' },
+  { path: '/wordle', label: 'Wordle' },
+  { path: '/slice', label: 'Froyo Slice' },
+];
+
+/** Builds a tagged link for a post, story or ad, so its visitors show up as their own channel. */
+function LinkBuilder() {
+  const [page, setPage] = useState('/');
+  const [tags, setTags] = useState({ utm_source: 'instagram', utm_medium: 'story', utm_campaign: '', utm_content: '' });
+  const [copied, setCopied] = useState(false);
+
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(tags)) {
+    const clean = value.trim().toLowerCase().replace(/\s+/g, '_');
+    if (clean) params.set(key, clean);
+  }
+  const link = `${SITE}${page}${params.toString() ? `?${params}` : ''}`;
+  const ready = Boolean(tags.utm_source.trim() && tags.utm_campaign.trim());
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt('링크를 복사하세요', link);
+    }
+  };
+
+  const field = (key: keyof typeof tags, label: string, placeholder: string) => (
+    <label className="rw-field">
+      <span>{label}</span>
+      <input value={tags[key]} placeholder={placeholder} onChange={(e) => setTags({ ...tags, [key]: e.target.value })} />
+    </label>
+  );
+
+  return (
+    <Section title="UTM 링크 만들기" note="게시물, 스토리, 광고마다 campaign이나 content를 다르게 하면 어드민의 유입 경로에서 따로 집계돼요. 한글과 띄어쓰기도 되지만 영문 소문자를 추천해요.">
+      <div className="ad-link card">
+        <label className="rw-field">
+          <span>연결할 페이지</span>
+          <select value={page} onChange={(e) => setPage(e.target.value)}>
+            {LINK_PAGES.map((p) => (
+              <option key={p.path} value={p.path}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {field('utm_source', 'source (필수)', 'instagram')}
+        {field('utm_medium', 'medium', 'story, post, reel, ad, bio')}
+        {field('utm_campaign', 'campaign (필수)', 'launch_2026')}
+        {field('utm_content', 'content', 'video_a')}
+        <div className="ad-link-out">
+          <code>{link}</code>
+          <button type="button" className="btn btn-sm btn-primary" onClick={() => void copy()} disabled={!ready}>
+            {copied ? '복사됨' : '복사'}
+          </button>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function Daily({ data }: { data: AdminOverview }) {
   return (
     <Section
@@ -796,6 +925,7 @@ export function AdminPage() {
             </div>
             <RangePicker range={range} busy={busy} onChange={choose} />
             <Totals data={data} />
+            <Channels data={data} />
             <Coupons data={data} />
             <Games data={data} />
             <Scores data={data} />
@@ -803,6 +933,7 @@ export function AdminPage() {
             <Daily data={data} />
             <Players data={data} />
             <CouponSearch />
+            <LinkBuilder />
           </>
         )}
       </div>

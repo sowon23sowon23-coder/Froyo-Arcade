@@ -4,6 +4,7 @@ import { PROMOTION } from '../config';
 import { admin, rewardsConfigured } from './supabase';
 
 export type EventType =
+  | 'landing'
   | 'game_start'
   | 'game_complete'
   | 'mission_achieved'
