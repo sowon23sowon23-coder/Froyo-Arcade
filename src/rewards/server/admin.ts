@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
+import { PROMOTION } from '../config';
 import type { CouponView } from '../types';
 import { buildOverview, type AdminOverview, type DateRange, type StatClaim, type StatEvent, type StatUser } from './adminStats';
 import { COUPON_COLUMNS, toView, type CouponRow } from './coupons';
@@ -134,6 +135,24 @@ export async function overview(range: DateRange | null): Promise<AdminOverview> 
     nowMs: now,
     range,
   });
+}
+
+/** Every coupon with its owner's email, newest first, for CSV export. Limited to coupons issued in the period, if one is given. */
+export async function exportCoupons(range: DateRange | null): Promise<AdminCoupon[]> {
+  const now = Date.now();
+  const [rows, emails] = await Promise.all([
+    allRows<CouponRow & { user_id: string }>('coupons', `${COUPON_COLUMNS}, user_id`, 'issued_at'),
+    emailsById(),
+  ]);
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: PROMOTION.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return rows
+    .filter((row) => {
+      if (!range) return true;
+      const issued = day.format(new Date(row.issued_at));
+      return issued >= range.from && issued <= range.to;
+    })
+    .reverse()
+    .map((row) => ({ ...toView(row, now), email: emails.get(row.user_id) ?? '' }));
 }
 
 async function emailsById(): Promise<Map<string, string>> {

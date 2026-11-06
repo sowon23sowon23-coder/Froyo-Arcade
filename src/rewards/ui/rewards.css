@@ -690,6 +690,34 @@
   letter-spacing: 0.06em;
 }
 
+.ad-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ad-section-head .section-label {
+  margin-bottom: 0;
+}
+
+.ad-section-head + * {
+  margin-top: 10px;
+}
+
+.ad-csv {
+  gap: 4px;
+  min-height: 0;
+  padding: 4px 10px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+.ad-csv svg {
+  width: 14px;
+  height: 14px;
+}
+
 .ad-daily th,
 .ad-daily td {
   padding: 7px 8px;

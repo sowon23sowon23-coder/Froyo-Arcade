@@ -5,6 +5,7 @@ import { GameShell } from '@/components/arcade/GameShell';
 import { getGame, type GameSlug } from '@/games/registry';
 import type { AdminCoupon } from '../server/admin';
 import type { AdminOverview, DateRange, PlayerRow } from '../server/adminStats';
+import { csvName, csvTime, downloadCsv, toCsv } from '../csv';
 import { formatDateTime, storeDay } from '../format';
 import type { CouponStatus } from '../types';
 import './rewards.css';
@@ -164,10 +165,24 @@ function Kpi({ label, value, note }: { label: string; value: string; note?: stri
   );
 }
 
-function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+function CsvButton({ onClick, label = 'CSV' }: { onClick: () => void; label?: string }) {
+  return (
+    <button type="button" className="btn btn-sm btn-ghost ad-csv" onClick={onClick}>
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {label}
+    </button>
+  );
+}
+
+function Section({ title, note, action, children }: { title: string; note?: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="ad-section">
-      <h3 className="section-label">{title}</h3>
+      <div className="ad-section-head">
+        <h3 className="section-label">{title}</h3>
+        {action}
+      </div>
       {children}
       {note && <p className="rw-fine ad-note">{note}</p>}
     </section>
@@ -193,10 +208,136 @@ function Table({ head, children }: { head: string[]; children: ReactNode }) {
   );
 }
 
+/* ---------- CSV exports ---------- */
+// Times go out as seconds and rates as numbers, so a spreadsheet can add them up.
+
+const seconds = (ms: number) => Math.round(ms / 1000);
+const ratio = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : '');
+
+function exportSummary(data: AdminOverview) {
+  const t = data.totals;
+  const rows: (string | number)[][] = [
+    ['요약', '플레이어(브라우저)', t.players],
+    ['요약', '시작한 판', t.plays],
+    ['요약', '끝까지 마친 판', t.completes],
+    ['요약', '총 플레이 시간(초)', seconds(t.playMs)],
+    ['요약', '로그인 계정(전체)', t.accounts],
+    ['요약', data.range ? '기간 내 신규 계정' : '전체 계정', t.newAccounts],
+    ['요약', data.range ? '기간 내 로그인' : '최근 7일 로그인', t.recentSignIns],
+    ['요약', '미션 달성 플레이어', t.playersWithMission],
+    ['요약', '발급 쿠폰', t.coupons],
+    ['요약', '쿠폰 QR 실행', t.qrExecuted],
+    ['요약', '매장 길찾기 클릭', t.storeClicks],
+    ['요약', '쿠폰 업그레이드', t.upgrades],
+    ...STATUS_ORDER.map((s) => ['쿠폰 상태', STATUS_TEXT[s], data.byStatus[s]]),
+    ...data.byPercent.map((p) => ['할인율별 쿠폰', p.percentOff ? `${p.percentOff}%` : '할인율 없음', p.count]),
+  ];
+  downloadCsv(csvName('summary', data.range), toCsv(['구분', '항목', '값'], rows));
+}
+
+function exportGames(data: AdminOverview) {
+  downloadCsv(
+    csvName('games', data.range),
+    toCsv(
+      ['게임', '플레이어', '시작', '완료', '평균 시간(초)', '중간 시간(초)', '총 시간(초)', '미션 달성', '달성률(%)', '쿠폰 발급', 'QR 실행', '매장 클릭', '의심 기록'],
+      data.games.map((g) => [
+        gameName(g.game),
+        g.players,
+        g.plays,
+        g.completes,
+        g.timedRounds ? seconds(g.averageMs) : '',
+        g.timedRounds ? seconds(g.medianMs) : '',
+        g.timedRounds ? seconds(g.totalMs) : '',
+        g.missions,
+        ratio(g.missions, g.completes),
+        g.coupons,
+        g.qr,
+        g.storeClicks,
+        g.suspicious,
+      ])
+    )
+  );
+}
+
+function exportScores(data: AdminOverview) {
+  const rows: (string | number)[][] = [];
+  for (const s of data.scores) {
+    const name = gameName(s.game);
+    const unit = s.game === 'crush' ? '레벨' : '점';
+    rows.push(
+      [name, s.basis === 'player' ? '플레이어 수' : '판 수', s.samples, ''],
+      [name, `평균(${unit})`, Math.round(s.average * 10) / 10, ''],
+      [name, `중간값(${unit})`, s.median, ''],
+      [name, `상위 10%(${unit})`, s.p90, ''],
+      [name, `최고(${unit})`, s.max, ''],
+      ...s.tiers.map((tier) => [name, `도달: ${tier.goal} (${tier.title})`, tier.reached, ratio(tier.reached, s.samples)])
+    );
+  }
+  const w = data.wordle;
+  rows.push(
+    ['Wordle', '끝난 판', w.rounds, ''],
+    ['Wordle', '정답', w.wins, ratio(w.wins, w.rounds)],
+    ['Wordle', '평균 시도', Math.round(w.averageAttempts * 10) / 10, ''],
+    ...w.attempts.map((count, i) => ['Wordle', `${i + 1}번째에 정답`, count, ratio(count, w.wins)])
+  );
+  downloadCsv(csvName('scores', data.range), toCsv(['게임', '항목', '값', '비율(%)'], rows));
+}
+
+function exportDaily(data: AdminOverview) {
+  downloadCsv(
+    csvName('daily', data.range),
+    toCsv(
+      ['날짜', '시작한 판', '플레이어', '새 계정', '쿠폰 발급', 'QR 실행'],
+      [...data.daily].reverse().map((d) => [d.date, d.plays, d.players, d.newAccounts, d.coupons, d.qr])
+    )
+  );
+}
+
+function exportPlayers(data: AdminOverview) {
+  const best = (p: PlayerRow, game: string) => p.best.find((b) => b.game === game)?.value ?? '';
+  downloadCsv(
+    csvName('players', data.range),
+    toCsv(
+      ['이메일', '로그인 방법', '가입', '최근 로그인', '시작', '완료', '플레이 시간(초)', 'Catch 최고', 'Slice 최고', 'Crush 최고 레벨', '미션', '쿠폰', '쿠폰 상태', 'QR 실행'],
+      data.players.map((p) => [
+        p.email,
+        p.provider,
+        csvTime(p.joinedAt),
+        csvTime(p.lastSignInAt),
+        p.plays,
+        p.completes,
+        seconds(p.playMs),
+        best(p, 'catch'),
+        best(p, 'slice'),
+        best(p, 'crush'),
+        p.missions,
+        p.couponTitle ?? '',
+        p.couponStatus ? STATUS_TEXT[p.couponStatus] : '',
+        csvTime(p.qrExecutedAt),
+      ])
+    )
+  );
+}
+
+/** The full coupon list comes from the server, since the page only holds counts. */
+async function exportCoupons(range: DateRange | null) {
+  const query = range ? `?from=${range.from}&to=${range.to}` : '';
+  try {
+    const res = await fetch(`/api/admin/coupons/export${query}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(String(res.status));
+    // Reading the body as text drops the byte-order mark Excel needs, so put it back.
+    const text = await res.text();
+    downloadCsv(csvName('coupons', range), text.startsWith('﻿') ? text : `﻿${text}`);
+  } catch {
+    window.alert('쿠폰 CSV를 만들지 못했어요. 다시 시도해 주세요.');
+  }
+}
+
 function Totals({ data }: { data: AdminOverview }) {
   const t = data.totals;
   return (
     <Section
+      action={<CsvButton onClick={() => exportSummary(data)} />}
       title={data.range ? '기간 요약' : '전체 요약'}
       note={`플레이어는 브라우저 기준이라, 한 사람이 기기를 바꾸거나 쿠키를 지우면 여러 명으로 세어져요. 숫자에는 테스트 기록도 포함돼요.${data.range ? ' 기간 내 로그인은 계정의 마지막 로그인만 기록돼서, 그 뒤에 다시 로그인한 사람은 빠져요.' : ''}`}
     >
@@ -222,6 +363,7 @@ function Coupons({ data }: { data: AdminOverview }) {
   return (
     <div className="ad-columns">
       <Section
+        action={<CsvButton label="쿠폰 전체 CSV" onClick={() => void exportCoupons(data.range)} />}
         title="쿠폰 상태"
         note={`QR 실행은 사용 시도예요. POS에서 결과를 받지 않아 실제 할인 적용 수는 알 수 없어요.${data.range ? ' 기간을 고르면 그 기간에 발급된 쿠폰의 현재 상태를 보여 줘요.' : ''}`}
       >
@@ -258,6 +400,7 @@ function Coupons({ data }: { data: AdminOverview }) {
 function Games({ data }: { data: AdminOverview }) {
   return (
     <Section
+      action={<CsvButton onClick={() => exportGames(data)} />}
       title="게임별 현황"
       note="시간은 끝까지 마친 판만 집계해요. 중간에 나간 판은 시간이 남지 않고, Wordle은 시간을 기록하지 않아요. Crush의 시간은 접속 1회당 마지막 클리어까지예요. 의심 기록은 서버가 불가능하다고 판단한 결과로, 점수와 시간에서 제외해요."
     >
@@ -286,7 +429,7 @@ function Games({ data }: { data: AdminOverview }) {
 function Scores({ data }: { data: AdminOverview }) {
   const w = data.wordle;
   return (
-    <Section title="게임별 점수" note="Catch와 Slice는 판 기준, Crush는 플레이어별 최고 레벨 기준이에요. 기록이 적으면 평균이 크게 흔들려요.">
+    <Section action={<CsvButton onClick={() => exportScores(data)} />} title="게임별 점수" note="Catch와 Slice는 판 기준, Crush는 플레이어별 최고 레벨 기준이에요. 기록이 적으면 평균이 크게 흔들려요.">
       <div className="ad-columns ad-columns-3">
         {data.scores.map((s) => {
           const unit = s.game === 'crush' ? '레벨' : '점';
@@ -428,6 +571,7 @@ function WordleAnswers() {
 function Daily({ data }: { data: AdminOverview }) {
   return (
     <Section
+      action={<CsvButton onClick={() => exportDaily(data)} />}
       title={data.range ? '날짜별 현황' : '최근 14일'}
       note={data.dailyTrimmed ? '기간이 길어서 가장 최근 92일만 보여 줘요. 위쪽 합계에는 기간 전체가 들어가요.' : undefined}
     >
@@ -501,6 +645,7 @@ function Players({ data }: { data: AdminOverview }) {
   const matches = data.players.filter((p) => p.email.toLowerCase().includes(q));
   return (
     <Section
+      action={<CsvButton onClick={() => exportPlayers(data)} />}
       title={`로그인 플레이어 (${whole(data.players.length)}명)`}
       note="로그인 전 기록은 같은 브라우저에서 로그인했거나 쿠폰을 받은 경우에만 계정과 연결돼요. 그래서 플레이 수가 실제보다 적게 보일 수 있어요. 달성률은 끝까지 마친 판 대비 미션 달성 비율이에요."
     >
