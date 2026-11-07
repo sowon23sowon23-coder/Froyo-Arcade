@@ -1,27 +1,26 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { GameShell } from '@/components/arcade/GameShell';
 import { getGame, type GameSlug } from '@/games/registry';
+import { NO_RECORD } from '../attribution';
 import type { AdminCoupon } from '../server/admin';
 import type { AdminOverview, DateRange, PlayerRow } from '../server/adminStats';
 import { csvName, csvTime, downloadCsv, toCsv } from '../csv';
 import { formatDateTime, storeDay } from '../format';
 import type { CouponStatus } from '../types';
+import { ADMIN_TEXT, type AdminText, type Lang } from './adminText';
 import './rewards.css';
 
-// Internal screen, so unlike the customer pages its text is in Korean.
+// Internal screen, in Korean by default with an English switch (adminText.ts).
 // Read-only: nothing here can change a coupon.
 
-const STATUS_TEXT: Record<CouponStatus, string> = {
-  waiting: '사용 전 (24시간 대기)',
-  available: '사용 가능',
-  showing: 'QR 표시 중',
-  shown: 'QR 실행됨',
-  expired: '소멸',
-};
 const STATUS_ORDER: CouponStatus[] = ['waiting', 'available', 'showing', 'shown', 'expired'];
 const PLAYER_LIMIT = 200;
+const LANG_KEY = 'froyo-arcade:admin-lang';
+
+const TextContext = createContext<AdminText>(ADMIN_TEXT.ko);
+const useText = () => useContext(TextContext);
 
 const gameName = (slug: string) => {
   try {
@@ -35,15 +34,10 @@ const whole = (n: number) => Math.round(n).toLocaleString('en-US');
 const one = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-US');
 const pct = (part: number, total: number) => (total > 0 ? `${Math.round((part / total) * 100)}%` : '-');
 
-function duration(ms: number): string {
+function duration(ms: number, t: AdminText): string {
   const total = Math.round(ms / 1000);
   if (total <= 0) return '-';
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h}시간 ${m}분`;
-  if (m > 0) return `${m}분 ${s}초`;
-  return `${s}초`;
+  return t.duration(Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60);
 }
 
 async function getJson<T>(url: string): Promise<{ status: number; data: T | null }> {
@@ -55,7 +49,22 @@ async function getJson<T>(url: string): Promise<{ status: number; data: T | null
   }
 }
 
+function LangToggle({ lang, onChange }: { lang: Lang; onChange: (lang: Lang) => void }) {
+  const t = useText();
+  return (
+    <button
+      type="button"
+      className="btn btn-sm btn-secondary ad-lang"
+      lang={lang === 'ko' ? 'en' : 'ko'}
+      onClick={() => onChange(lang === 'ko' ? 'en' : 'ko')}
+    >
+      {t.langLabel}
+    </button>
+  );
+}
+
 function Login({ onDone }: { onDone: () => void }) {
+  const t = useText();
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -78,25 +87,17 @@ function Login({ onDone }: { onDone: () => void }) {
     setBusy(false);
     if (status === 200) return onDone();
     setPassword('');
-    setError(
-      status === 401
-        ? '비밀번호가 맞지 않아요.'
-        : status === 429
-          ? '비밀번호를 여러 번 틀려서 잠겼어요. 15분 뒤에 다시 시도해 주세요.'
-          : status === 503
-            ? '어드민이 아직 설정되지 않았어요.'
-            : '연결에 문제가 있어요. 다시 시도해 주세요.'
-    );
+    setError(status === 401 ? t.wrongPassword : status === 429 ? t.locked : status === 503 ? t.notSetUp : t.connection);
   };
 
   return (
     <form className="rw-signin card ad-login" onSubmit={submit}>
       <label className="rw-field">
-        <span>어드민 비밀번호</span>
+        <span>{t.password}</span>
         <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={busy} />
       </label>
       <button type="submit" className="btn btn-primary btn-block" disabled={busy || !password}>
-        {busy ? '확인 중…' : '들어가기'}
+        {busy ? t.checking : t.enter}
       </button>
       {error && (
         <p className="rw-error" role="alert">
@@ -109,16 +110,17 @@ function Login({ onDone }: { onDone: () => void }) {
 
 /** Picks the period every section below it counts. Null means everything. */
 function RangePicker({ range, busy, onChange }: { range: DateRange | null; busy: boolean; onChange: (range: DateRange | null) => void }) {
+  const t = useText();
   const [draft, setDraft] = useState<{ from: string; to: string }>({ from: range?.from ?? '', to: range?.to ?? '' });
 
   useEffect(() => setDraft({ from: range?.from ?? '', to: range?.to ?? '' }), [range]);
 
   const today = storeDay();
-  const presets: { label: string; range: DateRange | null }[] = [
-    { label: '오늘', range: { from: today, to: today } },
-    { label: '최근 7일', range: { from: storeDay(6), to: today } },
-    { label: '최근 30일', range: { from: storeDay(29), to: today } },
-    { label: '전체', range: null },
+  const presets: { key: string; label: string; range: DateRange | null }[] = [
+    { key: 'today', label: t.today, range: { from: today, to: today } },
+    { key: '7', label: t.last7, range: { from: storeDay(6), to: today } },
+    { key: '30', label: t.last30, range: { from: storeDay(29), to: today } },
+    { key: 'all', label: t.all, range: null },
   ];
   const isActive = (preset: DateRange | null) => (preset === null ? range === null : range?.from === preset.from && range?.to === preset.to);
 
@@ -129,11 +131,11 @@ function RangePicker({ range, busy, onChange }: { range: DateRange | null; busy:
   };
 
   return (
-    <div className="ad-range card" role="group" aria-label="기간 선택">
+    <div className="ad-range card" role="group" aria-label={t.period}>
       <div className="ad-range-presets">
         {presets.map((preset) => (
           <button
-            key={preset.label}
+            key={preset.key}
             type="button"
             className={`btn btn-sm ${isActive(preset.range) ? 'btn-primary' : 'btn-secondary'}`}
             aria-pressed={isActive(preset.range)}
@@ -144,12 +146,12 @@ function RangePicker({ range, busy, onChange }: { range: DateRange | null; busy:
         ))}
       </div>
       <div className="ad-range-dates">
-        <input type="date" aria-label="시작 날짜" max={today} value={draft.from} onChange={(e) => set('from', e.target.value)} />
+        <input type="date" aria-label={t.startDate} max={today} value={draft.from} onChange={(e) => set('from', e.target.value)} />
         <span aria-hidden="true">~</span>
-        <input type="date" aria-label="끝 날짜" max={today} value={draft.to} onChange={(e) => set('to', e.target.value)} />
+        <input type="date" aria-label={t.endDate} max={today} value={draft.to} onChange={(e) => set('to', e.target.value)} />
       </div>
       <span className="rw-fine" role="status">
-        {busy ? '불러오는 중…' : '매장 시간대(PT) 기준'}
+        {busy ? t.loading : t.storeTime}
       </span>
     </div>
   );
@@ -210,36 +212,38 @@ function Table({ head, children }: { head: string[]; children: ReactNode }) {
 
 /* ---------- CSV exports ---------- */
 // Times go out as seconds and rates as numbers, so a spreadsheet can add them up.
+// Column titles follow the chosen language.
 
 const seconds = (ms: number) => Math.round(ms / 1000);
 const ratio = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : '');
 
-function exportSummary(data: AdminOverview) {
-  const t = data.totals;
+function exportSummary(data: AdminOverview, t: AdminText) {
+  const c = t.csv;
+  const s = data.totals;
   const rows: (string | number)[][] = [
-    ['요약', '플레이어(브라우저)', t.players],
-    ['요약', '시작한 판', t.plays],
-    ['요약', '끝까지 마친 판', t.completes],
-    ['요약', '총 플레이 시간(초)', seconds(t.playMs)],
-    ['요약', '로그인 계정(전체)', t.accounts],
-    ['요약', data.range ? '기간 내 신규 계정' : '전체 계정', t.newAccounts],
-    ['요약', data.range ? '기간 내 로그인' : '최근 7일 로그인', t.recentSignIns],
-    ['요약', '미션 달성 플레이어', t.playersWithMission],
-    ['요약', '발급 쿠폰', t.coupons],
-    ['요약', '쿠폰 QR 실행', t.qrExecuted],
-    ['요약', '매장 길찾기 클릭', t.storeClicks],
-    ['요약', '쿠폰 업그레이드', t.upgrades],
-    ...STATUS_ORDER.map((s) => ['쿠폰 상태', STATUS_TEXT[s], data.byStatus[s]]),
-    ...data.byPercent.map((p) => ['할인율별 쿠폰', p.percentOff ? `${p.percentOff}%` : '할인율 없음', p.count]),
+    [c.groupSummary, c.sPlayers, s.players],
+    [c.groupSummary, c.sPlays, s.plays],
+    [c.groupSummary, c.sCompletes, s.completes],
+    [c.groupSummary, c.sPlaySeconds, seconds(s.playMs)],
+    [c.groupSummary, c.sAccounts, s.accounts],
+    [c.groupSummary, data.range ? c.sNewRange : c.sNewAll, s.newAccounts],
+    [c.groupSummary, data.range ? c.sSignInRange : c.sSignIn7, s.recentSignIns],
+    [c.groupSummary, c.sMissionPlayers, s.playersWithMission],
+    [c.groupSummary, c.sCoupons, s.coupons],
+    [c.groupSummary, c.sQr, s.qrExecuted],
+    [c.groupSummary, c.sStoreClicks, s.storeClicks],
+    [c.groupSummary, c.sUpgrades, s.upgrades],
+    ...STATUS_ORDER.map((st) => [c.groupStatus, t.status[st], data.byStatus[st]]),
+    ...data.byPercent.map((p) => [c.groupPercent, p.percentOff ? `${p.percentOff}%` : t.noPercent, p.count]),
   ];
-  downloadCsv(csvName('summary', data.range), toCsv(['구분', '항목', '값'], rows));
+  downloadCsv(csvName('summary', data.range), toCsv(c.summaryHead, rows));
 }
 
-function exportGames(data: AdminOverview) {
+function exportGames(data: AdminOverview, t: AdminText) {
   downloadCsv(
     csvName('games', data.range),
     toCsv(
-      ['게임', '플레이어', '시작', '완료', '평균 시간(초)', '중간 시간(초)', '총 시간(초)', '미션 달성', '달성률(%)', '쿠폰 발급', 'QR 실행', '매장 클릭', '의심 기록'],
+      t.csv.gameHead,
       data.games.map((g) => [
         gameName(g.game),
         g.players,
@@ -259,40 +263,41 @@ function exportGames(data: AdminOverview) {
   );
 }
 
-function exportScores(data: AdminOverview) {
+function exportScores(data: AdminOverview, t: AdminText) {
+  const c = t.csv;
   const rows: (string | number)[][] = [];
   for (const s of data.scores) {
     const name = gameName(s.game);
-    const unit = s.game === 'crush' ? '레벨' : '점';
+    const unit = s.game === 'crush' ? t.unitLevel : t.unitScore;
     rows.push(
-      [name, s.basis === 'player' ? '플레이어 수' : '판 수', s.samples, ''],
-      [name, `평균(${unit})`, Math.round(s.average * 10) / 10, ''],
-      [name, `중간값(${unit})`, s.median, ''],
-      [name, `상위 10%(${unit})`, s.p90, ''],
-      [name, `최고(${unit})`, s.max, ''],
-      ...s.tiers.map((tier) => [name, `도달: ${tier.goal} (${tier.title})`, tier.reached, ratio(tier.reached, s.samples)])
+      [name, s.basis === 'player' ? c.samplePlayers : c.sampleRounds, s.samples, ''],
+      [name, c.withUnit(t.average, unit), Math.round(s.average * 10) / 10, ''],
+      [name, c.withUnit(t.median, unit), s.median, ''],
+      [name, c.withUnit(t.top10, unit), s.p90, ''],
+      [name, c.withUnit(t.max, unit), s.max, ''],
+      ...s.tiers.map((tier) => [name, c.reached(tier.goal, tier.title), tier.reached, ratio(tier.reached, s.samples)])
     );
   }
   const w = data.wordle;
   rows.push(
-    ['Wordle', '끝난 판', w.rounds, ''],
-    ['Wordle', '정답', w.wins, ratio(w.wins, w.rounds)],
-    ['Wordle', '평균 시도', Math.round(w.averageAttempts * 10) / 10, ''],
-    ...w.attempts.map((count, i) => ['Wordle', `${i + 1}번째에 정답`, count, ratio(count, w.wins)])
+    ['Wordle', t.wordleRounds, w.rounds, ''],
+    ['Wordle', t.wordleWins, w.wins, ratio(w.wins, w.rounds)],
+    ['Wordle', t.wordleAvg, Math.round(w.averageAttempts * 10) / 10, ''],
+    ...w.attempts.map((count, i) => ['Wordle', c.solvedOnNth(i + 1), count, ratio(count, w.wins)])
   );
-  downloadCsv(csvName('scores', data.range), toCsv(['게임', '항목', '값', '비율(%)'], rows));
+  downloadCsv(csvName('scores', data.range), toCsv(c.scoreHead, rows));
 }
 
-function exportChannels(data: AdminOverview) {
+function exportChannels(data: AdminOverview, t: AdminText) {
   downloadCsv(
     csvName('channels', data.range),
     toCsv(
-      ['source', 'medium', 'campaign', 'UTM 여부', '방문', '방문자', '플레이어', '시작한 판', '미션 달성', '쿠폰 발급', 'QR 실행', '방문자→쿠폰(%)', '쿠폰→QR(%)'],
+      t.csv.channelHead,
       data.channels.map((c) => [
-        c.source,
+        sourceLabel(c.source, t),
         c.medium,
         c.campaign,
-        c.tagged ? 'UTM' : '추정',
+        c.tagged ? 'UTM' : t.guessed,
         c.visits,
         c.visitors,
         c.players,
@@ -307,22 +312,22 @@ function exportChannels(data: AdminOverview) {
   );
 }
 
-function exportDaily(data: AdminOverview) {
+function exportDaily(data: AdminOverview, t: AdminText) {
   downloadCsv(
     csvName('daily', data.range),
     toCsv(
-      ['날짜', '시작한 판', '플레이어', '새 계정', '쿠폰 발급', 'QR 실행'],
+      t.csv.dailyHead,
       [...data.daily].reverse().map((d) => [d.date, d.plays, d.players, d.newAccounts, d.coupons, d.qr])
     )
   );
 }
 
-function exportPlayers(data: AdminOverview) {
+function exportPlayers(data: AdminOverview, t: AdminText) {
   const best = (p: PlayerRow, game: string) => p.best.find((b) => b.game === game)?.value ?? '';
   downloadCsv(
     csvName('players', data.range),
     toCsv(
-      ['이메일', '로그인 방법', '가입', '최근 로그인', '시작', '완료', '플레이 시간(초)', 'Catch 최고', 'Slice 최고', 'Crush 최고 레벨', '미션', '쿠폰', '쿠폰 상태', 'QR 실행'],
+      t.csv.playerHead,
       data.players.map((p) => [
         p.email,
         p.provider,
@@ -336,7 +341,7 @@ function exportPlayers(data: AdminOverview) {
         best(p, 'crush'),
         p.missions,
         p.couponTitle ?? '',
-        p.couponStatus ? STATUS_TEXT[p.couponStatus] : '',
+        p.couponStatus ? t.status[p.couponStatus] : '',
         csvTime(p.qrExecutedAt),
       ])
     )
@@ -344,75 +349,86 @@ function exportPlayers(data: AdminOverview) {
 }
 
 /** The full coupon list comes from the server, since the page only holds counts. */
-async function exportCoupons(range: DateRange | null) {
-  const query = range ? `?from=${range.from}&to=${range.to}` : '';
+async function exportCoupons(range: DateRange | null, lang: Lang, t: AdminText) {
+  const params = new URLSearchParams({ lang });
+  if (range) {
+    params.set('from', range.from);
+    params.set('to', range.to);
+  }
   try {
-    const res = await fetch(`/api/admin/coupons/export${query}`, { cache: 'no-store' });
+    const res = await fetch(`/api/admin/coupons/export?${params}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(String(res.status));
     // Reading the body as text drops the byte-order mark Excel needs, so put it back.
     const text = await res.text();
     downloadCsv(csvName('coupons', range), text.startsWith('﻿') ? text : `﻿${text}`);
   } catch {
-    window.alert('쿠폰 CSV를 만들지 못했어요. 다시 시도해 주세요.');
+    window.alert(t.couponCsvFailed);
   }
 }
 
+/** Channel names stored by the server, shown in the chosen language. */
+function sourceLabel(source: string, t: AdminText): string {
+  return source === NO_RECORD.source ? t.noRecord : source;
+}
+
 function Totals({ data }: { data: AdminOverview }) {
-  const t = data.totals;
+  const t = useText();
+  const s = data.totals;
   return (
     <Section
-      action={<CsvButton onClick={() => exportSummary(data)} />}
-      title={data.range ? '기간 요약' : '전체 요약'}
-      note={`플레이어는 브라우저 기준이라, 한 사람이 기기를 바꾸거나 쿠키를 지우면 여러 명으로 세어져요. 숫자에는 테스트 기록도 포함돼요.${data.range ? ' 기간 내 로그인은 계정의 마지막 로그인만 기록돼서, 그 뒤에 다시 로그인한 사람은 빠져요.' : ''}`}
+      action={<CsvButton onClick={() => exportSummary(data, t)} />}
+      title={data.range ? t.summaryRange : t.summaryAll}
+      note={`${t.summaryNote}${data.range ? t.summaryNoteRange : ''}`}
     >
       <div className="ad-tiles">
-        <Kpi label="플레이어" value={whole(t.players)} note={`총 ${whole(t.plays)}판 시작`} />
+        <Kpi label={t.kPlayers} value={whole(s.players)} note={t.kPlaysStarted(whole(s.plays))} />
         <Kpi
-          label="로그인 계정 (전체)"
-          value={whole(t.accounts)}
-          note={data.range ? `기간 내 신규 ${whole(t.newAccounts)}명 · 로그인 ${whole(t.recentSignIns)}명` : `최근 7일 로그인 ${whole(t.recentSignIns)}명`}
+          label={t.kAccounts}
+          value={whole(s.accounts)}
+          note={data.range ? t.kAccountsRange(whole(s.newAccounts), whole(s.recentSignIns)) : t.kAccountsAll(whole(s.recentSignIns))}
         />
-        <Kpi label="총 플레이 시간" value={duration(t.playMs)} note="끝까지 마친 판 기준" />
-        <Kpi label="미션 달성 플레이어" value={whole(t.playersWithMission)} note={`플레이어의 ${pct(t.playersWithMission, t.players)}`} />
-        <Kpi label="발급 쿠폰" value={whole(t.coupons)} note={`플레이어 대비 ${pct(t.coupons, t.players)}`} />
-        <Kpi label="쿠폰 QR 실행" value={whole(t.qrExecuted)} note={`발급 쿠폰의 ${pct(t.qrExecuted, t.coupons)}`} />
-        <Kpi label="매장 길찾기 클릭" value={whole(t.storeClicks)} />
-        <Kpi label="쿠폰 업그레이드" value={whole(t.upgrades)} />
+        <Kpi label={t.kPlayTime} value={duration(s.playMs, t)} note={t.kPlayTimeNote} />
+        <Kpi label={t.kMissionPlayers} value={whole(s.playersWithMission)} note={t.ofPlayers(pct(s.playersWithMission, s.players))} />
+        <Kpi label={t.kCoupons} value={whole(s.coupons)} note={t.perPlayers(pct(s.coupons, s.players))} />
+        <Kpi label={t.kQr} value={whole(s.qrExecuted)} note={t.ofCoupons(pct(s.qrExecuted, s.coupons))} />
+        <Kpi label={t.kStoreClicks} value={whole(s.storeClicks)} />
+        <Kpi label={t.kUpgrades} value={whole(s.upgrades)} />
       </div>
     </Section>
   );
 }
 
-function Coupons({ data }: { data: AdminOverview }) {
+function Coupons({ data, lang }: { data: AdminOverview; lang: Lang }) {
+  const t = useText();
   return (
     <div className="ad-columns">
       <Section
-        action={<CsvButton label="쿠폰 전체 CSV" onClick={() => void exportCoupons(data.range)} />}
-        title="쿠폰 상태"
-        note={`QR 실행은 사용 시도예요. POS에서 결과를 받지 않아 실제 할인 적용 수는 알 수 없어요.${data.range ? ' 기간을 고르면 그 기간에 발급된 쿠폰의 현재 상태를 보여 줘요.' : ''}`}
+        action={<CsvButton label={t.allCouponsCsv} onClick={() => void exportCoupons(data.range, lang, t)} />}
+        title={t.couponStatus}
+        note={`${t.couponStatusNote}${data.range ? t.couponStatusNoteRange : ''}`}
       >
-        <Table head={['상태', '쿠폰 수', '비율']}>
+        <Table head={t.statusHead}>
           {STATUS_ORDER.map((status) => (
             <tr key={status}>
-              <th scope="row">{STATUS_TEXT[status]}</th>
+              <th scope="row">{t.status[status]}</th>
               <td>{whole(data.byStatus[status])}</td>
               <td>{pct(data.byStatus[status], data.totals.coupons)}</td>
             </tr>
           ))}
         </Table>
       </Section>
-      <Section title="할인율별 쿠폰">
-        <Table head={['할인율', '쿠폰 수', '비율']}>
+      <Section title={t.byPercent}>
+        <Table head={t.percentHead}>
           {data.byPercent.map((row) => (
             <tr key={row.percentOff}>
-              <th scope="row">{row.percentOff ? `${row.percentOff}%` : '할인율 없음'}</th>
+              <th scope="row">{row.percentOff ? `${row.percentOff}%` : t.noPercent}</th>
               <td>{whole(row.count)}</td>
               <td>{pct(row.count, data.totals.coupons)}</td>
             </tr>
           ))}
           {data.byPercent.length === 0 && (
             <tr>
-              <td colSpan={3}>아직 발급된 쿠폰이 없어요.</td>
+              <td colSpan={3}>{t.noCoupons}</td>
             </tr>
           )}
         </Table>
@@ -422,22 +438,19 @@ function Coupons({ data }: { data: AdminOverview }) {
 }
 
 function Games({ data }: { data: AdminOverview }) {
+  const t = useText();
   return (
-    <Section
-      action={<CsvButton onClick={() => exportGames(data)} />}
-      title="게임별 현황"
-      note="시간은 끝까지 마친 판만 집계해요. 중간에 나간 판은 시간이 남지 않고, Wordle은 시간을 기록하지 않아요. Crush의 시간은 접속 1회당 마지막 클리어까지예요. 의심 기록은 서버가 불가능하다고 판단한 결과로, 점수와 시간에서 제외해요."
-    >
-      <Table head={['게임', '플레이어', '시작', '완료', '평균 시간', '중간 시간', '총 시간', '미션 달성', '달성률', '쿠폰 발급', 'QR 실행', '의심 기록']}>
+    <Section action={<CsvButton onClick={() => exportGames(data, t)} />} title={t.games} note={t.gamesNote}>
+      <Table head={t.gameHead}>
         {data.games.map((g) => (
           <tr key={g.game}>
             <th scope="row">{gameName(g.game)}</th>
             <td>{whole(g.players)}</td>
             <td>{whole(g.plays)}</td>
             <td>{whole(g.completes)}</td>
-            <td>{g.timedRounds ? duration(g.averageMs) : '-'}</td>
-            <td>{g.timedRounds ? duration(g.medianMs) : '-'}</td>
-            <td>{g.timedRounds ? duration(g.totalMs) : '-'}</td>
+            <td>{g.timedRounds ? duration(g.averageMs, t) : '-'}</td>
+            <td>{g.timedRounds ? duration(g.medianMs, t) : '-'}</td>
+            <td>{g.timedRounds ? duration(g.totalMs, t) : '-'}</td>
             <td>{whole(g.missions)}</td>
             <td>{pct(g.missions, g.completes)}</td>
             <td>{whole(g.coupons)}</td>
@@ -451,55 +464,36 @@ function Games({ data }: { data: AdminOverview }) {
 }
 
 function Scores({ data }: { data: AdminOverview }) {
+  const t = useText();
   const w = data.wordle;
+  const stat = (label: string, value: string) => (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
   return (
-    <Section action={<CsvButton onClick={() => exportScores(data)} />} title="게임별 점수" note="Catch와 Slice는 판 기준, Crush는 플레이어별 최고 레벨 기준이에요. 기록이 적으면 평균이 크게 흔들려요.">
+    <Section action={<CsvButton onClick={() => exportScores(data, t)} />} title={t.scores} note={t.scoresNote}>
       <div className="ad-columns ad-columns-3">
         {data.scores.map((s) => {
-          const unit = s.game === 'crush' ? '레벨' : '점';
+          const unit = s.game === 'crush' ? t.unitLevel : t.unitScore;
+          const show = (v: string) => (s.samples ? `${v}${unit}` : '-');
           return (
             <div key={s.game} className="ad-score card">
               <b>{gameName(s.game)}</b>
               <dl>
-                <div>
-                  <dt>{s.basis === 'player' ? '플레이어' : '판'}</dt>
-                  <dd>{whole(s.samples)}</dd>
-                </div>
-                <div>
-                  <dt>평균</dt>
-                  <dd>
-                    {s.samples ? one(s.average) : '-'}
-                    {s.samples ? unit : ''}
-                  </dd>
-                </div>
-                <div>
-                  <dt>중간값</dt>
-                  <dd>
-                    {s.samples ? one(s.median) : '-'}
-                    {s.samples ? unit : ''}
-                  </dd>
-                </div>
-                <div>
-                  <dt>상위 10%</dt>
-                  <dd>
-                    {s.samples ? whole(s.p90) : '-'}
-                    {s.samples ? unit : ''}
-                  </dd>
-                </div>
-                <div>
-                  <dt>최고</dt>
-                  <dd>
-                    {s.samples ? whole(s.max) : '-'}
-                    {s.samples ? unit : ''}
-                  </dd>
-                </div>
+                {stat(s.basis === 'player' ? t.samplePlayers : t.sampleRounds, whole(s.samples))}
+                {stat(t.average, show(one(s.average)))}
+                {stat(t.median, show(one(s.median)))}
+                {stat(t.top10, show(whole(s.p90)))}
+                {stat(t.max, show(whole(s.max)))}
               </dl>
               <table>
                 <thead>
                   <tr>
-                    <th scope="col">할인 기준</th>
-                    <th scope="col">할인</th>
-                    <th scope="col">도달</th>
+                    <th scope="col">{t.tierGoal}</th>
+                    <th scope="col">{t.tierDiscount}</th>
+                    <th scope="col">{t.tierReached}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -520,32 +514,21 @@ function Scores({ data }: { data: AdminOverview }) {
         <div className="ad-score card">
           <b>{gameName('wordle')}</b>
           <dl>
-            <div>
-              <dt>끝난 판</dt>
-              <dd>{whole(w.rounds)}</dd>
-            </div>
-            <div>
-              <dt>정답</dt>
-              <dd>
-                {whole(w.wins)} ({pct(w.wins, w.rounds)})
-              </dd>
-            </div>
-            <div>
-              <dt>평균 시도</dt>
-              <dd>{w.wins ? `${one(w.averageAttempts)}번` : '-'}</dd>
-            </div>
+            {stat(t.wordleRounds, whole(w.rounds))}
+            {stat(t.wordleWins, `${whole(w.wins)} (${pct(w.wins, w.rounds)})`)}
+            {stat(t.wordleAvg, w.wins ? t.tries(one(w.averageAttempts)) : '-')}
           </dl>
           <table>
             <thead>
               <tr>
-                <th scope="col">맞힌 시도</th>
-                <th scope="col">판 수</th>
+                <th scope="col">{t.solvedOn}</th>
+                <th scope="col">{t.roundCount}</th>
               </tr>
             </thead>
             <tbody>
               {w.attempts.map((count, i) => (
                 <tr key={i}>
-                  <th scope="row">{i + 1}번째</th>
+                  <th scope="row">{t.nth(i + 1)}</th>
                   <td>{whole(count)}</td>
                 </tr>
               ))}
@@ -559,6 +542,7 @@ function Scores({ data }: { data: AdminOverview }) {
 
 /** Stays hidden until asked for, so it isn't on screen for anyone walking past. */
 function WordleAnswers() {
+  const t = useText();
   const [answers, setAnswers] = useState<{ date: string; answer: string }[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -569,44 +553,41 @@ function WordleAnswers() {
   };
 
   return (
-    <Section title="Wordle 정답" note="정답을 아는 사람은 바로 미션을 달성할 수 있으니 외부에 공유하지 마세요. Vercel의 WORDLE_SECRET을 바꾸면 정답도 바뀌어요.">
+    <Section title={t.answers} note={t.answersNote}>
       {answers ? (
         <div className="ad-answers">
           {answers.map((row, i) => (
             <div key={row.date} className={`ad-tile card${i === 0 ? ' is-today' : ''}`}>
-              <span>{i === 0 ? `오늘 ${row.date}` : row.date}</span>
+              <span>{i === 0 ? t.todayDate(row.date) : row.date}</span>
               <b>{row.answer}</b>
             </div>
           ))}
           <button type="button" className="btn btn-sm btn-ghost" onClick={() => setAnswers(null)}>
-            숨기기
+            {t.hide}
           </button>
         </div>
       ) : (
         <button type="button" className="btn btn-sm btn-secondary" onClick={() => void reveal()}>
-          정답 보기
+          {t.showAnswers}
         </button>
       )}
-      {failed && <p className="rw-error">불러오지 못했어요. 다시 시도해 주세요.</p>}
+      {failed && <p className="rw-error">{t.loadFailedRetry}</p>}
     </Section>
   );
 }
 
 function Channels({ data }: { data: AdminOverview }) {
+  const t = useText();
   return (
-    <Section
-      action={<CsvButton onClick={() => exportChannels(data)} />}
-      title="유입 경로"
-      note="방문은 그 경로로 들어온 횟수예요. 플레이, 쿠폰, QR은 그 브라우저가 처음 UTM 링크로 들어온 경로로 집계해요. UTM이 없으면 인스타그램 같은 앱 안 브라우저나 이전 사이트로 추정해요(추정 표시). 유입 기록 없음은 이 기능을 넣기 전 기록이에요."
-    >
-      <Table head={['경로 (source / medium / campaign)', '방문', '방문자', '플레이어', '시작한 판', '미션 달성', '쿠폰 발급', 'QR 실행', '방문자→쿠폰', '쿠폰→QR']}>
+    <Section action={<CsvButton onClick={() => exportChannels(data, t)} />} title={t.channels} note={t.channelsNote}>
+      <Table head={t.channelHead}>
         {data.channels.map((c) => (
           <tr key={`${c.source}|${c.medium}|${c.campaign}`}>
             <th scope="row" className="ad-channel">
-              <b>{c.source}</b>
+              <b>{sourceLabel(c.source, t)}</b>
               {c.medium && <span> / {c.medium}</span>}
               {c.campaign && <span> / {c.campaign}</span>}
-              {!c.tagged && c.medium !== '' && <em>추정</em>}
+              {!c.tagged && c.medium !== '' && <em>{t.guessed}</em>}
             </th>
             <td>{whole(c.visits)}</td>
             <td>{whole(c.visitors)}</td>
@@ -621,7 +602,7 @@ function Channels({ data }: { data: AdminOverview }) {
         ))}
         {data.channels.length === 0 && (
           <tr>
-            <td colSpan={10}>아직 기록이 없어요.</td>
+            <td colSpan={10}>{t.noData}</td>
           </tr>
         )}
       </Table>
@@ -630,16 +611,11 @@ function Channels({ data }: { data: AdminOverview }) {
 }
 
 const SITE = 'https://froyo-arcade.vercel.app';
-const LINK_PAGES = [
-  { path: '/', label: '홈' },
-  { path: '/catch', label: 'Froyo Catch' },
-  { path: '/crush', label: 'Froyo Crush' },
-  { path: '/wordle', label: 'Wordle' },
-  { path: '/slice', label: 'Froyo Slice' },
-];
+const LINK_PAGES = ['/', '/catch', '/crush', '/wordle', '/slice'];
 
 /** Builds a tagged link for a post, story or ad, so its visitors show up as their own channel. */
 function LinkBuilder() {
+  const t = useText();
   const [page, setPage] = useState('/');
   const [tags, setTags] = useState({ utm_source: 'instagram', utm_medium: 'story', utm_campaign: '', utm_content: '' });
   const [copied, setCopied] = useState(false);
@@ -658,7 +634,7 @@ function LinkBuilder() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      window.prompt('링크를 복사하세요', link);
+      window.prompt(t.copyPrompt, link);
     }
   };
 
@@ -670,26 +646,26 @@ function LinkBuilder() {
   );
 
   return (
-    <Section title="UTM 링크 만들기" note="게시물, 스토리, 광고마다 campaign이나 content를 다르게 하면 어드민의 유입 경로에서 따로 집계돼요. 한글과 띄어쓰기도 되지만 영문 소문자를 추천해요.">
+    <Section title={t.linkBuilder} note={t.linkBuilderNote}>
       <div className="ad-link card">
         <label className="rw-field">
-          <span>연결할 페이지</span>
+          <span>{t.linkPage}</span>
           <select value={page} onChange={(e) => setPage(e.target.value)}>
-            {LINK_PAGES.map((p) => (
-              <option key={p.path} value={p.path}>
-                {p.label}
+            {LINK_PAGES.map((path) => (
+              <option key={path} value={path}>
+                {path === '/' ? t.home : gameName(path.slice(1))}
               </option>
             ))}
           </select>
         </label>
-        {field('utm_source', 'source (필수)', 'instagram')}
+        {field('utm_source', `source (${t.required})`, 'instagram')}
         {field('utm_medium', 'medium', 'story, post, reel, ad, bio')}
-        {field('utm_campaign', 'campaign (필수)', 'launch_2026')}
+        {field('utm_campaign', `campaign (${t.required})`, 'launch_2026')}
         {field('utm_content', 'content', 'video_a')}
         <div className="ad-link-out">
           <code>{link}</code>
           <button type="button" className="btn btn-sm btn-primary" onClick={() => void copy()} disabled={!ready}>
-            {copied ? '복사됨' : '복사'}
+            {copied ? t.copied : t.copy}
           </button>
         </div>
       </div>
@@ -698,27 +674,28 @@ function LinkBuilder() {
 }
 
 function Daily({ data }: { data: AdminOverview }) {
+  const t = useText();
   return (
     <Section
-      action={<CsvButton onClick={() => exportDaily(data)} />}
-      title={data.range ? '날짜별 현황' : '최근 14일'}
-      note={data.dailyTrimmed ? '기간이 길어서 가장 최근 92일만 보여 줘요. 위쪽 합계에는 기간 전체가 들어가요.' : undefined}
+      action={<CsvButton onClick={() => exportDaily(data, t)} />}
+      title={data.range ? t.dailyRange : t.dailyAll}
+      note={data.dailyTrimmed ? t.dailyTrimmed : undefined}
     >
       <DailyGrid days={data.daily} />
     </Section>
   );
 }
 
-const DAILY_ROWS: [keyof AdminOverview['daily'][number], string][] = [
-  ['plays', '시작한 판'],
-  ['players', '플레이어'],
-  ['newAccounts', '새 계정'],
-  ['coupons', '쿠폰 발급'],
-  ['qr', 'QR 실행'],
-];
-
 /** Days run left to right, oldest first, so a whole period fits in five short rows. */
 function DailyGrid({ days }: { days: AdminOverview['daily'] }) {
+  const t = useText();
+  const rows: [keyof AdminOverview['daily'][number], string][] = [
+    ['plays', t.dPlays],
+    ['players', t.dPlayers],
+    ['newAccounts', t.dNewAccounts],
+    ['coupons', t.dCoupons],
+    ['qr', t.dQr],
+  ];
   const ordered = [...days].reverse();
   const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
   const box = useRef<HTMLDivElement>(null);
@@ -731,19 +708,19 @@ function DailyGrid({ days }: { days: AdminOverview['daily'] }) {
       <table>
         <thead>
           <tr>
-            <th scope="col">항목</th>
+            <th scope="col">{t.measure}</th>
             {ordered.map((d) => (
               <th key={d.date} scope="col" title={d.date}>
                 {shortDate(d.date)}
               </th>
             ))}
             <th scope="col" className="ad-daily-total">
-              합계
+              {t.total}
             </th>
           </tr>
         </thead>
         <tbody>
-          {DAILY_ROWS.map(([key, label]) => {
+          {rows.map(([key, label]) => {
             const values = ordered.map((d) => Number(d[key]));
             return (
               <tr key={key}>
@@ -763,52 +740,55 @@ function DailyGrid({ days }: { days: AdminOverview['daily'] }) {
   );
 }
 
-function bestText(player: PlayerRow): string {
+function bestText(player: PlayerRow, t: AdminText): string {
   if (!player.best.length) return '-';
-  return player.best.map((b) => `${gameName(b.game).replace('Froyo ', '')} ${b.game === 'crush' ? `레벨 ${b.value}` : `${whole(b.value)}점`}`).join(', ');
+  return player.best
+    .map((b) => {
+      const game = gameName(b.game).replace('Froyo ', '');
+      return b.game === 'crush' ? t.bestLevel(game, b.value) : t.bestScore(game, whole(b.value));
+    })
+    .join(', ');
 }
 
 function Players({ data }: { data: AdminOverview }) {
+  const t = useText();
   const [filter, setFilter] = useState('');
   const q = filter.trim().toLowerCase();
   const matches = data.players.filter((p) => p.email.toLowerCase().includes(q));
   return (
-    <Section
-      action={<CsvButton onClick={() => exportPlayers(data)} />}
-      title={`로그인 플레이어 (${whole(data.players.length)}명)`}
-      note="로그인 전 기록은 같은 브라우저에서 로그인했거나 쿠폰을 받은 경우에만 계정과 연결돼요. 그래서 플레이 수가 실제보다 적게 보일 수 있어요. 달성률은 끝까지 마친 판 대비 미션 달성 비율이에요."
-    >
-      <input className="ad-filter" aria-label="이메일로 찾기" placeholder="이메일로 찾기" value={filter} onChange={(e) => setFilter(e.target.value)} />
-      <Table head={['이메일', '로그인 방법', '가입', '최근 로그인', '시작', '완료', '플레이 시간', '최고 기록', '미션', '달성률', '쿠폰', '상태', 'QR 실행']}>
+    <Section action={<CsvButton onClick={() => exportPlayers(data, t)} />} title={t.players(whole(data.players.length))} note={t.playersNote}>
+      <input className="ad-filter" aria-label={t.findEmail} placeholder={t.findEmail} value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <Table head={t.playerHead}>
         {matches.slice(0, PLAYER_LIMIT).map((p) => (
           <tr key={p.userId}>
-            <th scope="row">{p.email || '(이메일 없음)'}</th>
-            <td>{p.provider === 'google' ? 'Google' : p.provider === 'email' ? '이메일' : p.provider}</td>
+            <th scope="row">{p.email || t.noEmail}</th>
+            <td>{p.provider === 'google' ? 'Google' : p.provider === 'email' ? t.providerEmail : p.provider}</td>
             <td>{formatDateTime(p.joinedAt)}</td>
             <td>{p.lastSignInAt ? formatDateTime(p.lastSignInAt) : '-'}</td>
             <td>{whole(p.plays)}</td>
             <td>{whole(p.completes)}</td>
-            <td>{duration(p.playMs)}</td>
-            <td className="ad-left">{bestText(p)}</td>
+            <td>{duration(p.playMs, t)}</td>
+            <td className="ad-left">{bestText(p, t)}</td>
             <td>{whole(p.missions)}</td>
             <td>{pct(p.missions, p.completes)}</td>
             <td>{p.couponTitle?.replace(' off 1 cup', '') ?? '-'}</td>
-            <td>{p.couponStatus ? STATUS_TEXT[p.couponStatus] : '-'}</td>
+            <td>{p.couponStatus ? t.status[p.couponStatus] : '-'}</td>
             <td>{p.qrExecutedAt ? formatDateTime(p.qrExecutedAt) : '-'}</td>
           </tr>
         ))}
         {matches.length === 0 && (
           <tr>
-            <td colSpan={13}>해당하는 플레이어가 없어요.</td>
+            <td colSpan={13}>{t.noPlayers}</td>
           </tr>
         )}
       </Table>
-      {matches.length > PLAYER_LIMIT && <p className="rw-fine ad-note">최근 로그인 순으로 {PLAYER_LIMIT}명까지 보여 줘요. 이메일로 찾아보세요.</p>}
+      {matches.length > PLAYER_LIMIT && <p className="rw-fine ad-note">{t.playerLimit(PLAYER_LIMIT)}</p>}
     </Section>
   );
 }
 
 function CouponSearch() {
+  const t = useText();
   const [query, setQuery] = useState('');
   const [coupons, setCoupons] = useState<AdminCoupon[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -824,7 +804,7 @@ function CouponSearch() {
   }, [run]);
 
   return (
-    <Section title="쿠폰 찾기" note="기간과 상관없이 모든 쿠폰에서 찾아요. 검색하지 않으면 최근 발급된 20개를 보여 줘요.">
+    <Section title={t.couponSearch} note={t.couponSearchNote}>
       <form
         className="ad-search"
         onSubmit={(e) => {
@@ -832,21 +812,21 @@ function CouponSearch() {
           void run(query);
         }}
       >
-        <input aria-label="이메일 또는 쿠폰 코드" placeholder="이메일 또는 쿠폰 코드" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input aria-label={t.emailOrCode} placeholder={t.emailOrCode} value={query} onChange={(e) => setQuery(e.target.value)} />
         <button type="submit" className="btn btn-sm btn-primary">
-          검색
+          {t.search}
         </button>
       </form>
-      {failed && <p className="rw-error">불러오지 못했어요. 다시 시도해 주세요.</p>}
-      {coupons?.length === 0 && <div className="card rw-empty">찾은 쿠폰이 없어요.</div>}
+      {failed && <p className="rw-error">{t.loadFailedRetry}</p>}
+      {coupons?.length === 0 && <div className="card rw-empty">{t.noCouponFound}</div>}
       {coupons && coupons.length > 0 && (
-        <Table head={['이메일', '쿠폰 코드', '혜택', '상태', '획득 게임', '발급', '만료', 'QR 실행']}>
+        <Table head={t.couponHead}>
           {coupons.map((c) => (
             <tr key={c.id}>
-              <th scope="row">{c.email || '(이메일 없음)'}</th>
+              <th scope="row">{c.email || t.noEmail}</th>
               <td className="rw-code">{c.code}</td>
               <td>{c.rewardTitle}</td>
-              <td>{STATUS_TEXT[c.status]}</td>
+              <td>{t.status[c.status]}</td>
               <td>{gameName(c.sourceGame)}</td>
               <td>{formatDateTime(c.issuedAt)}</td>
               <td>{c.expiresAt ? formatDateTime(c.expiresAt) : '-'}</td>
@@ -860,11 +840,31 @@ function CouponSearch() {
 }
 
 export function AdminPage() {
+  const [lang, setLang] = useState<Lang>('ko');
   const [state, setState] = useState<'loading' | 'login' | 'error' | 'ready'>('loading');
   const [data, setData] = useState<AdminOverview | null>(null);
   const [range, setRange] = useState<DateRange | null>(null);
   const [busy, setBusy] = useState(false);
   const latest = useRef(0);
+  const t = ADMIN_TEXT[lang];
+
+  // The chosen language is remembered in this browser.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(LANG_KEY) === 'en') setLang('en');
+    } catch {
+      // storage blocked: stay in Korean
+    }
+  }, []);
+
+  const changeLang = (next: Lang) => {
+    setLang(next);
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch {
+      // storage blocked: the choice lasts until reload
+    }
+  };
 
   const load = useCallback(async (period: DateRange | null) => {
     // Quick clicks can answer out of order; only the newest request counts.
@@ -898,45 +898,47 @@ export function AdminPage() {
   };
 
   return (
-    <GameShell title="어드민" className="admin">
-      <div className="ad-page screen-in">
-        {state === 'loading' && <p className="rw-muted">불러오는 중…</p>}
-        {state === 'login' && <Login onDone={() => void load(range)} />}
-        {state === 'error' && (
-          <div className="card rw-empty">
-            불러오지 못했어요.
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => void load(range)}>
-              다시 시도
-            </button>
-          </div>
-        )}
-        {state === 'ready' && data && (
-          <>
-            <div className="ad-bar">
-              <span className="rw-fine">기준 시각 {formatDateTime(data.generatedAt)}</span>
-              <div>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={() => void load(range)}>
-                  새로고침
-                </button>
-                <button type="button" className="btn btn-sm btn-ghost" onClick={() => void logout()}>
-                  로그아웃
-                </button>
-              </div>
+    <TextContext.Provider value={t}>
+      <GameShell title={t.title} className="admin" headerRight={<LangToggle lang={lang} onChange={changeLang} />}>
+        <div className="ad-page screen-in" lang={lang}>
+          {state === 'loading' && <p className="rw-muted">{t.loading}</p>}
+          {state === 'login' && <Login onDone={() => void load(range)} />}
+          {state === 'error' && (
+            <div className="card rw-empty">
+              {t.loadFailed}
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => void load(range)}>
+                {t.retry}
+              </button>
             </div>
-            <RangePicker range={range} busy={busy} onChange={choose} />
-            <Totals data={data} />
-            <Channels data={data} />
-            <Coupons data={data} />
-            <Games data={data} />
-            <Scores data={data} />
-            <WordleAnswers />
-            <Daily data={data} />
-            <Players data={data} />
-            <CouponSearch />
-            <LinkBuilder />
-          </>
-        )}
-      </div>
-    </GameShell>
+          )}
+          {state === 'ready' && data && (
+            <>
+              <div className="ad-bar">
+                <span className="rw-fine">{t.asOf(formatDateTime(data.generatedAt))}</span>
+                <div>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => void load(range)}>
+                    {t.refresh}
+                  </button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => void logout()}>
+                    {t.logout}
+                  </button>
+                </div>
+              </div>
+              <RangePicker range={range} busy={busy} onChange={choose} />
+              <Totals data={data} />
+              <Channels data={data} />
+              <Coupons data={data} lang={lang} />
+              <Games data={data} />
+              <Scores data={data} />
+              <WordleAnswers />
+              <Daily data={data} />
+              <Players data={data} />
+              <CouponSearch />
+              <LinkBuilder />
+            </>
+          )}
+        </div>
+      </GameShell>
+    </TextContext.Provider>
   );
 }

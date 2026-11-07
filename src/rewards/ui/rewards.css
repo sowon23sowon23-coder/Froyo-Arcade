@@ -746,6 +746,10 @@
   font-size: var(--fs-xs);
 }
 
+.ad-lang {
+  min-width: 76px;
+}
+
 .ad-section-head {
   display: flex;
   align-items: center;
