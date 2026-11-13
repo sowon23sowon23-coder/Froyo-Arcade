@@ -145,7 +145,7 @@ Complete **any one** game's mission and an account can save **one coupon per pro
    - **Continue with Google** appears only in a regular browser, because Google blocks sign-in in in-app browsers.
 5. The server issues the coupon, upgrades the existing one if this result pays more, or returns it unchanged: the database allows one per account per promotion.
 6. The coupon can be used from `activationHours` (24) after it is issued, for `validDays` (7). **My Rewards** counts down to each of those moments on the server's clock.
-7. In store: the customer opens **My Rewards** and hands their phone to staff. Staff tap **Staff only: Use in store** → **Staff: Show QR now**, and the QR for that coupon's discount shows for `qrDisplaySeconds` (15), then disappears for good. The site can't verify who taps: this relies on the on-screen instructions and store practice.
+7. In store: at the register the customer opens **My Rewards**, taps **Use in store** → **Show QR now**, and holds the QR for that coupon's discount to the scanner. It shows for `qrDisplaySeconds` (15), then disappears for good.
 8. Used and expired coupons, from any promotion, stay listed under **Used and expired rewards** in **My Rewards**, without a QR.
 
 ### Coupon states
@@ -196,7 +196,7 @@ The state is never stored. It is derived from `valid_from`, `expires_at`, and `q
 
 ### Mockup
 
-`/rewards/preview` shows every coupon screen with made-up data, including the staff steps and the QR countdown. It never calls the server, and its QR holds a value no POS accepts. It isn't linked from the site, and it returns 404 once `draft` is `false`.
+`/rewards/preview` shows every coupon screen with made-up data, including the use-in-store steps and the QR countdown. It never calls the server, and its QR holds a value no POS accepts. It isn't linked from the site, and it returns 404 once `draft` is `false`.
 
 ### Promotion settings
 

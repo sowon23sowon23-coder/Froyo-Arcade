@@ -5,7 +5,7 @@ import { PROMOTION } from '../config';
 import { QrCode } from './QrCode';
 import './rewards.css';
 
-/** Step 2: make sure staff are ready before the one-time window starts. */
+/** Step 2: make sure the customer is at the scanner before the one-time window starts. */
 export function ConfirmSheet({ busy, onConfirm, onCancel }: { busy: boolean; onConfirm: () => void; onCancel: () => void }) {
   const confirmRef = useRef<HTMLButtonElement>(null);
   useEffect(() => confirmRef.current?.focus({ preventScroll: true }), []);
@@ -16,17 +16,14 @@ export function ConfirmSheet({ busy, onConfirm, onCancel }: { busy: boolean; onC
         <div className="sheet-icon" aria-hidden="true">
           🏪
         </div>
-        <h2 id="rw-confirm-title">Staff only</h2>
+        <h2 id="rw-confirm-title">Ready to scan?</h2>
         <p className="sheet-message">
-          <b>Customer:</b> please hand your phone to staff.
-        </p>
-        <p className="sheet-message">
-          <b>Staff:</b> tap <b>Show QR now</b> when your scanner is ready. The QR stays on screen for{' '}
+          Tap <b>Show QR now</b> only when you&apos;re at the register, in front of the scanner. The QR stays on screen for{' '}
           <b>{PROMOTION.qrDisplaySeconds} seconds</b> and <b>can&apos;t be opened again</b>.
         </p>
         <div className="sheet-actions">
           <button ref={confirmRef} type="button" className="btn btn-block btn-primary" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Opening…' : 'Staff: Show QR now'}
+            {busy ? 'Opening…' : 'Show QR now'}
           </button>
           <button type="button" className="btn btn-block btn-ghost" onClick={onCancel} disabled={busy}>
             Not yet
@@ -50,7 +47,7 @@ function clockText(ms: number): string {
  * The shared store QR with a live countdown. Time comes from the server's
  * start time plus the offset between the server clock and this phone, so a
  * refresh or another device shows only what is left of the same window.
- * The ticking clock and moving ring help staff tell a live screen from a screenshot.
+ * The ticking clock and moving ring help staff nearby tell a live screen from a screenshot.
  */
 export function QrOverlay({
   value,
@@ -89,7 +86,7 @@ export function QrOverlay({
     return () => clearInterval(id);
   }, [offsetMs, showUntilMs]);
 
-  // Keep the screen awake while staff scan.
+  // Keep the screen awake during the scan.
   useEffect(() => {
     let lock: { release: () => Promise<void> } | null = null;
     const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
@@ -108,7 +105,7 @@ export function QrOverlay({
     <div className="rw-qr-overlay" role="dialog" aria-modal="true" aria-labelledby="rw-qr-title">
       <div className="rw-qr-card">
         {mockup && <p className="rw-mock-banner">Mockup: this QR won&apos;t work in store.</p>}
-        <h2 id="rw-qr-title">Staff: scan this QR</h2>
+        <h2 id="rw-qr-title">Hold this QR to the scanner</h2>
         <p className="rw-qr-reward">{rewardTitle}</p>
         <div className="rw-qr-frame">
           <QrCode value={value} label="Store QR code" />

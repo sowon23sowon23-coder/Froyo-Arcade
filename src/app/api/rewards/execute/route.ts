@@ -5,7 +5,7 @@ import { currentUser, rewardsConfigured, storeQrValue } from '@/rewards/server/s
 import type { ExecuteResponse } from '@/rewards/types';
 
 /**
- * "Staff: Show QR now" at the register. The first successful call fixes the start
+ * "Show QR now" at the register. The first successful call fixes the start
  * time; later calls (refresh, second device, double tap) get the same window
  * back. A call that fails before the database write leaves the coupon unused.
  */

@@ -45,7 +45,7 @@ export const PROMOTION = {
       'One reward per account for this promotion. A higher score upgrades it until you open the in-store QR.',
       'Each reward applies to 1 cup.',
       `Usable from ${ACTIVATION_HOURS} hours after it is issued, for ${VALID_DAYS} days. Upgrading does not change these dates.`,
-      `Hand your phone to staff at the register. Staff open the QR, which stays on screen for ${QR_DISPLAY_SECONDS} seconds and opens only once.`,
+      `At the register, tap Use in store and hold the QR to the scanner. It stays on screen for ${QR_DISPLAY_SECONDS} seconds and opens only once.`,
       'Valid at participating stores only. Cannot be combined with other offers.',
     ],
   },

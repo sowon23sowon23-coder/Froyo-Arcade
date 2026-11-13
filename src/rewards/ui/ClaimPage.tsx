@@ -92,7 +92,7 @@ export function ClaimPage() {
             {result.upgraded
               ? 'Your reward went up. Its dates stay the same.'
               : result.newlyIssued
-                ? 'Once the countdown ends, open My Rewards at the store and hand your phone to staff at the register.'
+                ? 'Once the countdown ends, open My Rewards at the register, tap Use in store and scan the QR.'
                 : 'Each account has one reward per promotion, and this result did not raise it. Games are still free to play.'}
           </p>
         </div>

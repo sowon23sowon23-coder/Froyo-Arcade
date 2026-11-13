@@ -107,16 +107,16 @@ export function CouponMockup() {
             <CouponCard coupon={coupon} serverNow={new Date(nowMs).toISOString()} />
             {state === 'waiting' && (
               <p className="rw-fine rw-center">
-                The staff button opens when the countdown ends. Saving or viewing your reward does not open the QR.
+                Use in store opens when the countdown ends. Saving or viewing your reward does not open the QR.
               </p>
             )}
             {state === 'available' && (
               <div className="rw-use">
                 <button type="button" className="btn btn-primary btn-block" onClick={() => setConfirming(true)}>
-                  Staff only: Use in store
+                  Use in store
                 </button>
                 <p className="rw-fine">
-                  Don&apos;t tap this yourself. Hand your phone to staff at the register, and they will open the QR. It works only once.
+                  Tap this at the register, then hold the QR to the scanner. It works only once, so wait until you are ready to pay.
                 </p>
               </div>
             )}
